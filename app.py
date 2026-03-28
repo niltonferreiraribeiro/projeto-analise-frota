@@ -59,6 +59,14 @@ def parse_df_meta(df_meta_str):
     except:
         return 90.50
 
+def convert_to_serializable(obj):
+    """Convert datetime/time objects to strings for JSON serialization"""
+    if hasattr(obj, 'strftime'):  # datetime or date object
+        return obj.strftime('%Y-%m-%d %H:%M:%S')
+    elif hasattr(obj, 'hour'):  # time object
+        return obj.strftime('%H:%M:%S')
+    return str(obj) if obj is not None else ""
+
 def process_excel(filepath, df_meta):
     """
     Process Excel file and generate comprehensive failure analysis.
@@ -122,15 +130,15 @@ def process_excel(filepath, df_meta):
             # Calculate duration in seconds
             duration_seconds = parse_time(duration)
 
-            # Store failure record
+            # Store failure record (convert datetime/time to strings)
             failure_record = {
-                'date': date_val,
+                'date': convert_to_serializable(date_val),
                 'equipment': str(equipment),
                 'description': description,
                 'system': system,
                 'subsystem': subsystem,
-                'start_time': start_time,
-                'end_time': end_time,
+                'start_time': convert_to_serializable(start_time),
+                'end_time': convert_to_serializable(end_time),
                 'duration': seconds_to_hms(duration_seconds),
                 'duration_seconds': duration_seconds,
                 'failure_description': failure_description

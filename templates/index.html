@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Análise de Falhas - Escavadeiras CAT</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            width: 100%;
+            max-width: 1400px;
+            align-items: start;
+        }
+
+        /* Upload Panel */
+        .upload-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            position: sticky;
+            top: 20px;
+        }
+
+        .upload-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .upload-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .upload-header p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .upload-content {
+            padding: 40px 30px;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-section label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dropzone {
+            border: 3px dashed #2a5298;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+
+        .dropzone:hover {
+            border-color: #667eea;
+            background-color: #f0f4ff;
+            transform: translateY(-2px);
+        }
+
+        .dropzone.drag-over {
+            border-color: #667eea;
+            background-color: #e8f0ff;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .dropzone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .dropzone-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .dropzone-subtext {
+            font-size: 13px;
+            color: #999;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-name {
+            color: #2a5298;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .file-size {
+            color: #999;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #2a5298;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+
+        .input-group .unit {
+            color: #666;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-message {
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Report Panel */
+        .report-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .report-content {
+            padding: 30px;
+        }
+
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .report-header h2 {
+            color: #1e3c72;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .report-actions .btn {
+            padding: 10px 20px;
+            font-size: 13px;
+            flex: none;
+        }
+
+        .placeholder-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        .placeholder-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Responsiveness */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-panel {
+                position: static;
+            }
+
+            .report-panel {
+                max-height: none;
+                min-height: 500px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .upload-header h1 {
+                font-size: 22px;
+            }
+
+            .upload-content {
+                padding: 25px 20px;
+            }
+
+            .dropzone {
+                padding: 30px 15px;
+            }
+
+            .dropzone-icon {
+                font-size: 40px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .report-actions {
+                flex-direction: column;
+            }
+
+            .report-actions .btn {
+                width: 100%;
+            }
+        }
+
+        /* Scrollbar styling */
+        .report-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .report-panel::-webkit-scrollbar-track {
+            background: #f0f0f0;
+        }
+
+        .report-panel::-webkit-scrollbar-thumb {
+            background: #2a5298;
+            border-radius: 4px;
+        }
+
+        .report-panel::-webkit-scrollbar-thumb:hover {
+            background: #1e3c72;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Upload Panel -->
+        <div class="upload-panel">
+            <div class="upload-header">
+                <h1>📊 Análise Automática</h1>
+                <p>Sistema de Análise de Falhas e Confiabilidade da Frota de Escavadeiras CAT</p>
+            </div>
+
+            <div class="upload-content">
+                <!-- File Upload -->
+                <div class="upload-section">
+                    <label for="fileInput">📄 Arquivo Excel</label>
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon">📥</div>
+                        <div class="dropzone-text">Arraste o arquivo aqui</div>
+                        <div class="dropzone-subtext">ou clique para selecionar (.xlsx)</div>
+                    </div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xlsm">
+                    <div class="file-info" id="fileInfo">
+                        <div class="file-name" id="fileName"></div>
+                        <div class="file-size" id="fileSize"></div>
+                    </div>
+                </div>
+
+                <!-- DF Meta Input -->
+                <div class="upload-section">
+                    <label for="dfMeta">🎯 Meta de Disponibilidade (DF)</label>
+                    <div class="input-group">
+                        <input
+                            type="number"
+                            id="dfMeta"
+                            placeholder="90.50"
+                            value="90.50"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                        >
+                        <div class="unit">%</div>
+                    </div>
+                </div>
+
+                <!-- Status Message -->
+                <div class="status-message" id="statusMessage"></div>
+
+                <!-- Buttons -->
+                <div class="button-group">
+                    <button class="btn btn-primary" id="analyzeBtn" disabled>
+                        🚀 Gerar Análise
+                    </button>
+                    <button class="btn btn-secondary" id="clearBtn">
+                        🔄 Limpar
+                    </button>
+                </div>
+
+                <!-- Info -->
+                <div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; font-size: 13px; color: #666; line-height: 1.6;">
+                    <strong>ℹ️ Como usar:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Faça upload do arquivo <strong>perfil_de_perda_YYYY.xlsx</strong></li>
+                        <li>Define a meta de DF desejada (padrão: 90,50%)</li>
+                        <li>Clique em "Gerar Análise"</li>
+                        <li>Visualize o relatório completo em segundos</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Panel -->
+        <div class="report-panel">
+            <div id="reportContent">
+                <div class="placeholder-message">
+                    <div class="placeholder-icon">📋</div>
+                    <div>Faça upload de um arquivo Excel para gerar o relatório de análise</div>
+                    <p style="margin-top: 15px; font-size: 13px; opacity: 0.7;">O sistema analisará as falhas e gerará um relatório profissional em segundos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const dfMeta = document.getElementById('dfMeta');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const reportContent = document.getElementById('reportContent');
+
+        let selectedFile = null;
+
+        // File selection via click
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelect(e.target.files[0]);
+        });
+
+        // Drag and drop
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('drag-over');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+            handleFileSelect(e.dataTransfer.files[0]);
+        });
+
+        function handleFileSelect(file) {
+            if (!file) return;
+
+            if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xlsm')) {
+                showStatus('Apenas arquivos .xlsx ou .xlsm são permitidos', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = `✅ ${file.name}`;
+            fileSize.textContent = `Tamanho: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            fileInfo.classList.add('show');
+
+            analyzeBtn.disabled = false;
+            showStatus('Arquivo selecionado com sucesso!', 'success');
+        }
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showStatus('Por favor, selecione um arquivo', 'error');
+                return;
+            }
+
+            // Validate DF Meta
+            const meta = parseFloat(dfMeta.value);
+            if (isNaN(meta) || meta < 0 || meta > 100) {
+                showStatus('Meta de DF deve estar entre 0 e 100', 'error');
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<span class="loading-spinner"></span>Processando...';
+            showStatus('Processando arquivo... por favor aguarde', 'info');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                formData.append('df_meta', meta);
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    reportContent.innerHTML = result.report;
+                    showStatus('✅ Análise concluída com sucesso!', 'success');
+                    addReportActions();
+                } else {
+                    showStatus(`❌ Erro: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erro ao processar: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '🚀 Gerar Análise';
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.classList.remove('show');
+            dfMeta.value = '90.50';
+            analyzeBtn.disabled = true;
+            statusMessage.classList.remove('show');
+            reportContent.innerHTML = `
+                <div class="placeholder-message">
+                    <div class="placeholder-icon">📋</div>
+                    <div>Faça upload de um arquivo Excel para gerar o relatório de análise</div>
+                    <p style="margin-top: 15px; font-size: 13px; opacity: 0.7;">O sistema analisará as falhas e gerará um relatório profissional em segundos</p>
+                </div>
+            `;
+        });
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message show ${type}`;
+        }
+
+        function addReportActions() {
+            // Remove existing buttons if any
+            const existing = document.querySelector('.report-actions');
+            if (existing) existing.remove();
+
+            const actions = document.createElement('div');
+            actions.className = 'report-actions';
+            actions.innerHTML = `
+                <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir</button>
+                <button class="btn btn-secondary" onclick="downloadHTML()">💾 Baixar HTML</button>
+            `;
+
+            const reportHeader = reportContent.querySelector('.report-header');
+            if (reportHeader) {
+                reportHeader.appendChild(actions);
+            }
+        }
+
+        window.downloadHTML = function() {
+            const element = document.documentElement;
+            const html = reportContent.innerHTML;
+            const blob = new Blob([`
+                <!DOCTYPE html>
+                <html lang="pt-BR">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Relatório - Análise de Falhas</title>
+                </head>
+                <body>
+                    ${html}
+                </body>
+                </html>
+            `], { type: 'text/html' });
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Relatorio_Analise_Falhas_${new Date().toISOString().split('T')[0]}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        };
+
+        // Initialize
+        dfMeta.value = '90.50';
+    </script>
+</body>
+</html>

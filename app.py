@@ -5,19 +5,19 @@ import os
 import json as _json
 from datetime import datetime, timedelta
 from collections import defaultdict
-
+ 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'uploads'
-
+ 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
-
+ 
 ALLOWED_EXTENSIONS = {'xlsx', 'xlsm'}
-
+ 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
+ 
 def parse_time(time_obj):
     if time_obj is None:
         return 0
@@ -36,12 +36,12 @@ def parse_time(time_obj):
         return 0
     except:
         return 0
-
+ 
 def fmt_time(seconds):
     h = int(seconds // 3600)
     m = int((seconds % 3600) // 60)
     return "{}h{:02d}min".format(h, m)
-
+ 
 def parse_df_meta(v):
     try:
         if isinstance(v, str):
@@ -49,7 +49,7 @@ def parse_df_meta(v):
         return float(v)
     except:
         return 90.50
-
+ 
 def to_str(obj):
     if obj is None:
         return ""
@@ -58,7 +58,7 @@ def to_str(obj):
     if hasattr(obj, 'hour') and not hasattr(obj, 'year'):
         return "{:02d}:{:02d}:{:02d}".format(obj.hour, obj.minute, obj.second)
     return str(obj)
-
+ 
 def to_date(obj):
     """Convert to datetime.date for comparisons"""
     if obj is None:
@@ -76,7 +76,7 @@ def to_date(obj):
         except:
             pass
     return None
-
+ 
 def normalize_system(name):
     if not name:
         return name
@@ -94,8 +94,8 @@ def normalize_system(name):
         'giro': 'Giro',
     }
     return m.get(name.lower().strip(), name)
-
-
+ 
+ 
 def process_excel(filepath, df_meta):
     try:
         wb = openpyxl.load_workbook(filepath, data_only=True)
@@ -103,16 +103,16 @@ def process_excel(filepath, df_meta):
             return None, "Aba 'Escavadeira' não encontrada"
         if 'DF' not in wb.sheetnames:
             return None, "Aba 'DF' não encontrada"
-
+ 
         ws_f = wb['Escavadeira']
         ws_df = wb['DF']
-
+ 
         # === READ ALL FAILURES (full year data) ===
         all_failures = []
         eq_failures_all = defaultdict(list)
         sys_failures_all = defaultdict(list)
         fault_tracker = defaultdict(lambda: {'count': 0, 'equipments': set(), 'dates': [], 'system': '', 'subsystem': ''})
-
+ 
         row = 2
         empty = 0
         while empty < 5:
@@ -125,7 +125,7 @@ def process_excel(filepath, df_meta):
             if not str(eq).startswith('94'):
                 row += 1
                 continue
-
+ 
             date_val = ws_f['A{}'.format(row)].value
             desc = ws_f['C{}'.format(row)].value or ""
             system = normalize_system(ws_f['D{}'.format(row)].value or "")
@@ -134,11 +134,11 @@ def process_excel(filepath, df_meta):
             end_t = ws_f['G{}'.format(row)].value
             dur = ws_f['H{}'.format(row)].value
             fault = ws_f['I{}'.format(row)].value or ""
-
+ 
             dur_sec = parse_time(dur)
             date_str = to_str(date_val)
             date_obj = to_date(date_val)
-
+ 
             rec = {
                 'date': date_str,
                 'date_obj': date_obj,
@@ -152,7 +152,7 @@ def process_excel(filepath, df_meta):
                 'duration_sec': dur_sec,
                 'fault': fault
             }
-
+ 
             all_failures.append(rec)
             eq_failures_all[str(eq)].append(rec)
             if system:
@@ -163,27 +163,27 @@ def process_excel(filepath, df_meta):
                 fault_tracker[fault]['dates'].append(date_str)
                 fault_tracker[fault]['system'] = system
                 fault_tracker[fault]['subsystem'] = subsystem
-
+ 
             row += 1
-
+ 
         # === SEPARATE: current month vs year ===
         today = datetime.now().date()
         current_month = today.month
         current_year = today.year
         seven_days_ago = today - timedelta(days=7)
         yesterday = today - timedelta(days=1)
-
+ 
         failures_month = [f for f in all_failures if f['date_obj'] and f['date_obj'].month == current_month and f['date_obj'].year == current_year]
         failures_year = all_failures
         failures_7d = [f for f in all_failures if f['date_obj'] and f['date_obj'] >= seven_days_ago]
         failures_yesterday = [f for f in all_failures if f['date_obj'] and f['date_obj'] == yesterday]
-
+ 
         # Monthly aggregations
         eq_failures = defaultdict(list)
         sys_failures = defaultdict(list)
         subsys_failures = defaultdict(list)
         daily_failures = defaultdict(list)
-
+ 
         for f in failures_month:
             eq_failures[f['equipment']].append(f)
             if f['system']:
@@ -192,17 +192,17 @@ def process_excel(filepath, df_meta):
                 subsys_failures[f['subsystem']].append(f)
             if f['date']:
                 daily_failures[f['date']].append(f)
-
+ 
         total_month = len(failures_month)
         total_year = len(failures_year)
         total_time_month = sum(f['duration_sec'] for f in failures_month)
         total_time_7d = sum(f['duration_sec'] for f in failures_7d)
-
+ 
         # === DF DATA (columns: Equipamento, DF, Semana, Diario) ===
         equipment_df = {}
         equipment_df_semana = {}
         equipment_df_diario = {}
-
+ 
         for r in range(3, 20):
             eq_id = ws_df['F{}'.format(r)].value
             if not eq_id:
@@ -232,7 +232,7 @@ def process_excel(filepath, df_meta):
                     equipment_df_diario[eq_key] = float(str(dia_val).replace(',', '.'))
                 except:
                     pass
-
+ 
         # Fleet accumulated DF (mensal, semanal, diario)
         df_acumulado = 0
         df_acumulado_semana = 0
@@ -259,7 +259,7 @@ def process_excel(filepath, df_meta):
                     except:
                         pass
                 break
-
+ 
         # === WEEKLY DF DATA for chart (read additional week columns if available) ===
         # Look for week headers in row 2 starting from column J onwards
         weekly_df_data = []  # list of {'week': label, 'df': value}
@@ -267,9 +267,9 @@ def process_excel(filepath, df_meta):
         if df_acumulado_semana > 0:
             sem_header = ws_df['H2'].value or 'Semana'
             weekly_df_data.append({'week': str(sem_header), 'df': df_acumulado_semana})
-
+ 
         wb.close()
-
+ 
         # === ANALYSIS ===
         # System stats with total downtime
         sys_stats = []
@@ -282,7 +282,7 @@ def process_excel(filepath, df_meta):
                 'system': s, 'count': c, 'pct': round(pct, 1),
                 'risk': risk, 'total_time': fmt_time(total_sec), 'total_sec': total_sec
             })
-
+ 
         # Equipment stats sorted by total downtime
         eq_stats = []
         for e in sorted(eq_failures.keys(), key=lambda x: sum(f['duration_sec'] for f in eq_failures[x]), reverse=True):
@@ -304,7 +304,7 @@ def process_excel(filepath, df_meta):
                 'status': status, 'df': df_val,
                 'total_time': fmt_time(total_sec), 'total_sec': total_sec
             })
-
+ 
         # All equipment DF
         all_eq_df = []
         all_eq_ids = set(list(eq_failures.keys()) + [str(k) for k in equipment_df.keys()])
@@ -327,7 +327,7 @@ def process_excel(filepath, df_meta):
                 'failures': fc, 'status': st,
                 'total_time': fmt_time(total_sec), 'total_sec': total_sec
             })
-
+ 
         # DF performance stats
         df_values = [v for v in equipment_df.values() if v > 0]
         df_max = max(df_values) if df_values else 0
@@ -335,7 +335,7 @@ def process_excel(filepath, df_meta):
         df_avg = sum(df_values) / len(df_values) if df_values else 0
         above_meta = sum(1 for v in df_values if v >= df_meta)
         below_meta = sum(1 for v in df_values if v < df_meta)
-
+ 
         # Recurrent patterns
         subsys_dates = defaultdict(lambda: {'dates': [], 'count': 0, 'equipments': set(), 'system': ''})
         for f in failures_month:
@@ -345,7 +345,7 @@ def process_excel(filepath, df_meta):
                 subsys_dates[key]['count'] += 1
                 subsys_dates[key]['equipments'].add(f['equipment'])
                 subsys_dates[key]['system'] = f['system']
-
+ 
         recurrent = []
         for sub, data in sorted(subsys_dates.items(), key=lambda x: x[1]['count'], reverse=True):
             if data['count'] >= 2:
@@ -360,7 +360,7 @@ def process_excel(filepath, df_meta):
                     'equipments': ', '.join(sorted(data['equipments'])),
                     'interpretation': interpretation
                 })
-
+ 
         # === CRITICAL PATTERNS - Top 3 Month + Top 3 Year ===
         def build_critical_patterns(failure_list, equip_df, top_n=3):
             pattern_groups = defaultdict(lambda: {
@@ -376,7 +376,7 @@ def process_excel(filepath, df_meta):
                 pattern_groups[key]['system'] = f['system']
                 pattern_groups[key]['equipment'] = f['equipment']
                 pattern_groups[key]['subsystem'] = f['subsystem']
-
+ 
             patterns = []
             for key, grp in pattern_groups.items():
                 eq = grp['equipment']
@@ -425,10 +425,10 @@ def process_excel(filepath, df_meta):
                     })
             patterns.sort(key=lambda x: -x['score'])
             return patterns[:top_n]
-
+ 
         critical_month = build_critical_patterns(failures_month, equipment_df, 3)
         critical_year = build_critical_patterns(failures_year, equipment_df, 3)
-
+ 
         # Critical failures list
         critical_failures = []
         for f in failures_month:
@@ -437,7 +437,7 @@ def process_excel(filepath, df_meta):
             eq_fc = len(eq_failures.get(eq, []))
             if eq_df < 85 or eq_fc >= 5:
                 critical_failures.append(f)
-
+ 
         # Recommendations
         recommendations = {'CRITICA': [], 'ALTA': [], 'MEDIA': []}
         action_num = 1
@@ -472,7 +472,7 @@ def process_excel(filepath, df_meta):
                 'impact': 'Evitar degradação progressiva'
             })
             action_num += 1
-
+ 
         # Pareto data
         pareto_labels = [s['system'] for s in sys_stats]
         pareto_values = [s['count'] for s in sys_stats]
@@ -481,15 +481,15 @@ def process_excel(filepath, df_meta):
         for v in pareto_values:
             cum += v
             pareto_cumulative.append(round(cum / total_month * 100, 1) if total_month > 0 else 0)
-
+ 
         # Daily data for charts
         daily_labels = sorted(daily_failures.keys())
         daily_values = [len(daily_failures[d]) for d in daily_labels]
-
+ 
         # Equipment chart data
         eq_chart_labels = [e['equipment'] for e in eq_stats]
         eq_chart_values = [e['total_sec'] / 3600 for e in eq_stats]  # hours
-
+ 
         # Classify
         classified = {'RECORRENTE': 0, 'CRITICA': 0, 'POTENCIAL': 0, 'PONTUAL': 0}
         critical_set = set(id(f) for f in critical_failures)
@@ -505,7 +505,7 @@ def process_excel(filepath, df_meta):
                 classified['POTENCIAL'] += 1
             else:
                 classified['PONTUAL'] += 1
-
+ 
         # Predictions based on trends
         if total_month > 0 and daily_labels:
             days_elapsed = len(set(daily_labels))
@@ -515,7 +515,7 @@ def process_excel(filepath, df_meta):
         else:
             projected_failures = 0
             projected_hours = 0
-
+ 
         analysis = {
             'total_month': total_month,
             'total_year': total_year,
@@ -559,20 +559,20 @@ def process_excel(filepath, df_meta):
             'month_year': datetime.now().strftime('%B %Y'),
             'today_str': today.strftime('%d/%m/%Y')
         }
-
+ 
         return analysis, None
-
+ 
     except Exception as e:
         import traceback
         return None, "Erro: {}".format(traceback.format_exc())
-
-
+ 
+ 
 # ============================================================
 # REPORT GENERATION
 # ============================================================
 def generate_report(a):
     p = []
-
+ 
     # ======================== HTML HEAD ========================
     p.append('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">')
     p.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
@@ -631,32 +631,32 @@ def generate_report(a):
     p.append("@media(max-width:768px){.chart-row{grid-template-columns:1fr}.kpi-grid{grid-template-columns:1fr 1fr}}")
     p.append("@media print{.btn-pdf{display:none}body{background:#fff}.section{box-shadow:none;page-break-inside:avoid}}")
     p.append("</style></head><body>")
-
+ 
     # PDF Download button
     p.append('<button class="btn-pdf" onclick="downloadPDF()">📥 Baixar PDF</button>')
     p.append('<div id="report-content" class="container">')
-
+ 
     df_acum = a['df_acumulado']
     df_meta = a['df_meta']
     diff = df_acum - df_meta
     df_sem = a['df_acumulado_semana']
     df_dia = a['df_acumulado_diario']
-
+ 
     # ======================== HEADER ========================
     p.append('<div class="header">')
     p.append('<h1>Relatório de Confiabilidade</h1>')
     p.append('<div class="subtitle">{} | Frota de Escavadeiras CAT - GMO</div>'.format(a['month_year']))
     p.append('<div class="meta">Meta de DF: {:.2f}% | Atualizado: {}</div>'.format(df_meta, a['generation_time']))
     p.append('</div>')
-
+ 
     # ======================== RESUMO EXECUTIVO ========================
     p.append('<div class="section"><h2>Resumo Executivo</h2>')
-
+ 
     kpi_df_class = 'green' if df_acum >= df_meta else 'orange' if df_acum >= 50 else 'red'
     kpi_sem_class = 'green' if df_sem >= df_meta else 'orange' if df_sem >= 50 else 'red'
     kpi_dia_class = 'green' if df_dia >= df_meta else 'orange' if df_dia >= 50 else 'red'
     diff_txt = '{:+.2f}%'.format(diff)
-
+ 
     p.append('<div class="kpi-grid">')
     # DF Acumulada Mensal
     p.append('<div class="kpi {}"><div class="label">DF Acumulada Mensal</div><div class="value">{:.2f}%</div><div class="sub">{} da meta</div></div>'.format(
@@ -678,7 +678,7 @@ def generate_report(a):
     # Total horas paradas 7d
     p.append('<div class="kpi orange"><div class="label">Horas Paradas (7 Dias)</div><div class="value">{}</div><div class="sub">Últimos 7 dias</div></div>'.format(a['total_time_7d']))
     p.append('</div>')
-
+ 
     # Status box
     if diff >= 0:
         p.append('<div class="status-box"><strong>Status Geral: DENTRO DA META</strong><br>')
@@ -691,10 +691,10 @@ def generate_report(a):
     if n_rec > 0:
         p.append(' Identificados <strong>{} padrões de falhas recorrentes</strong>.'.format(n_rec))
     p.append('</div></div>')
-
+ 
     # ======================== DISPONIBILIDADE FÍSICA ========================
     p.append('<div class="section"><h2>Disponibilidade Física (DF)</h2>')
-
+ 
     p.append('<div class="kpi-grid">')
     p.append('<div class="kpi"><div class="label">DF Acumulada Mês</div><div class="value">{:.2f}%</div></div>'.format(df_acum))
     p.append('<div class="kpi"><div class="label">Máxima (Equipamento)</div><div class="value">{:.2f}%</div></div>'.format(a['df_max']))
@@ -702,11 +702,11 @@ def generate_report(a):
     p.append('<div class="kpi green"><div class="label">Acima da Meta</div><div class="value">{}</div><div class="sub">equipamentos</div></div>'.format(a['above_meta']))
     p.append('<div class="kpi red"><div class="label">Abaixo da Meta</div><div class="value">{}</div><div class="sub">equipamentos</div></div>'.format(a['below_meta']))
     p.append('</div>')
-
+ 
     # DF Chart placeholder (Meta vs Realizado)
     p.append('<h3>DF Mensal - Meta vs Realizado</h3>')
     p.append('<div class="chart-container"><canvas id="dfMensalChart"></canvas></div>')
-
+ 
     # Equipment DF table
     p.append('<h3>DF por Equipamento</h3>')
     p.append('<table><tr><th>Equipamento</th><th>DF Mês (%)</th><th>DF Semana (%)</th><th>DF Dia (%)</th><th>Falhas</th><th>Tempo Parado</th><th>Status</th></tr>')
@@ -722,7 +722,7 @@ def generate_report(a):
         p.append('<tr><td><strong>{}</strong></td><td>{:.2f}%</td><td>{:.2f}%</td><td>{:.2f}%</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
             eq['equipment'], eq['df'], eq['df_semana'], eq['df_diario'], eq['failures'], eq['total_time'], badge))
     p.append('</table></div>')
-
+ 
     # ======================== DIAS CRÍTICOS ========================
     critical_eq = [eq for eq in a['all_eq_df'] if eq['df'] > 0 and eq['df'] < df_meta]
     if critical_eq:
@@ -738,10 +738,10 @@ def generate_report(a):
                     eq_f[0]['system'], eq['total_time']))
             p.append('</div>')
         p.append('</div>')
-
+ 
     # ======================== FALHAS CRÍTICAS ========================
     p.append('<div class="section"><h2>Falhas Críticas Identificadas</h2>')
-
+ 
     # Top 3 do mês
     if a['critical_month']:
         p.append('<h3>Top 3 - Mês Atual</h3>')
@@ -762,7 +762,7 @@ def generate_report(a):
                 p.append('<br><strong style="color:#c0392b">Impacto DF:</strong> {}'.format(cp['df_impact']))
             p.append('<br><strong style="color:#c0392b">Risco:</strong> {}'.format(cp['risk']))
             p.append('</div></div>')
-
+ 
     # Top 3 do ano
     if a['critical_year']:
         p.append('<h3>Top 3 - Acumulado do Ano</h3>')
@@ -782,10 +782,10 @@ def generate_report(a):
             p.append('<br><strong style="color:#c0392b">Risco:</strong> {}'.format(cp['risk']))
             p.append('</div></div>')
     p.append('</div>')
-
+ 
     # ======================== PADRÕES E TENDÊNCIAS ========================
     p.append('<div class="section"><h2>Padrões e Tendências</h2>')
-
+ 
     # Falhas por Sistema com tempo parado
     p.append('<h3>Falhas por Sistema (Acumulado Mês)</h3>')
     p.append('<table><tr><th>Sistema</th><th>Ocorrências</th><th>%</th><th>Tempo Total Parado</th><th>Risco</th></tr>')
@@ -794,7 +794,7 @@ def generate_report(a):
         p.append('<tr><td><strong>{}</strong></td><td>{}</td><td>{:.1f}%</td><td>{}</td><td>{}</td></tr>'.format(
             s['system'], s['count'], s['pct'], s['total_time'], badge))
     p.append('</table>')
-
+ 
     # Equipamentos Críticos (sorted by total downtime)
     p.append('<h3>Equipamentos Críticos (por Tempo Parado)</h3>')
     p.append('<table><tr><th>Equipamento</th><th>Falhas</th><th>Tempo Total Parado</th><th>DF (%)</th><th>Status</th></tr>')
@@ -803,7 +803,7 @@ def generate_report(a):
         p.append('<tr><td><strong>{}</strong></td><td>{}</td><td>{}</td><td>{:.2f}%</td><td>{}</td></tr>'.format(
             e['equipment'], e['count'], e['total_time'], e['df'], badge))
     p.append('</table>')
-
+ 
     # Padrões Recorrentes
     if a['recurrent']:
         p.append('<h3>Padrões Recorrentes (2+ vezes)</h3>')
@@ -813,7 +813,7 @@ def generate_report(a):
             p.append('<br><span style="font-size:13px;color:#555">Equipamentos: {} | Datas: {} | {}</span>'.format(r['equipments'], r['dates'], r['interpretation']))
             p.append('</div>')
     p.append('</div>')
-
+ 
     # ======================== DASHBOARD ========================
     p.append('<div class="section"><h2>Dashboard</h2>')
     p.append('<div class="chart-row">')
@@ -825,7 +825,7 @@ def generate_report(a):
     p.append('<div><h3>DF por Equipamento</h3><div class="chart-container"><canvas id="dfChart"></canvas></div></div>')
     p.append('</div>')
     p.append('</div>')
-
+ 
     # ======================== AÇÕES RECOMENDADAS ========================
     p.append('<div class="section"><h2>Ações Recomendadas</h2>')
     if a['recommendations']['CRITICA']:
@@ -841,7 +841,7 @@ def generate_report(a):
         for act in a['recommendations']['MEDIA']:
             p.append('<div class="action-item action-media"><div class="action-title">{}. {}</div><div class="action-detail">{} | Impacto: {}</div></div>'.format(act['num'], act['title'], act['detail'], act['impact']))
     p.append('</div>')
-
+ 
     # ======================== PREVISÕES ========================
     p.append('<div class="section"><h2>Previsões</h2>')
     p.append('<div class="kpi-grid">')
@@ -854,7 +854,7 @@ def generate_report(a):
             p.append('<li><strong>{}</strong> ({}x): {} - se não tratado, risco de parada prolongada.</li>'.format(r['subsystem'], r['count'], r['interpretation']))
         p.append('</ul>')
     p.append('</div>')
-
+ 
     # ======================== CONCLUSÃO ========================
     p.append('<div class="section"><h2>Conclusão</h2>')
     if diff >= 0:
@@ -871,7 +871,7 @@ def generate_report(a):
             p.append('<li><strong>{}</strong> - {} ({}x)</li>'.format(r['subsystem'], r['interpretation'], r['count']))
         p.append('</ol>')
     p.append('</div>')
-
+ 
     p.append('<p><strong>Recomendação Final:</strong></p><ul>')
     p.append('<li>Executar ações críticas nos próximos 2-3 dias</li>')
     p.append('<li>Monitorar equipamentos com DF abaixo da meta</li>')
@@ -879,27 +879,27 @@ def generate_report(a):
     p.append('<li>Meta: atingir/manter {:.2f}%+ de DF</li>'.format(df_meta))
     p.append('</ul>')
     p.append('<p><strong>Próxima análise:</strong> {} (próximo dia útil)</p>'.format(a['today_str']))
-
+ 
     # GRD Box
     p.append('<div class="grd-box">')
     p.append('<strong>Engenharia de Manutenção e Confiabilidade - Setor GRD</strong><br>')
     p.append('Relatório gerado automaticamente pelo Sistema de Análise de Falhas e Confiabilidade')
     p.append('</div>')
     p.append('</div>')
-
+ 
     # ======================== FOOTER ========================
     p.append('<div class="footer">')
     p.append('<p>Relatório gerado automaticamente | {} | Engenharia GRD - Sistema de Análise de Falhas e Confiabilidade</p>'.format(a['generation_time']))
     p.append('</div>')
-
+ 
     # ======================== CHART.JS SCRIPTS ========================
     p.append('<script>')
-
+ 
     # DF Mensal Chart (Meta vs Realizado per equipment)
     df_eq_labels = [str(e['equipment']) for e in a['all_eq_df']]
     df_eq_vals = [e['df'] for e in a['all_eq_df']]
     meta_line = [df_meta] * len(df_eq_labels)
-
+ 
     p.append('const dfMensalCtx=document.getElementById("dfMensalChart").getContext("2d");')
     p.append('new Chart(dfMensalCtx,{type:"bar",data:{')
     p.append('labels:' + _json.dumps(df_eq_labels, ensure_ascii=False) + ',')
@@ -907,7 +907,7 @@ def generate_report(a):
     p.append('datasets:[{label:"DF Realizado %",data:' + _json.dumps(df_eq_vals) + ',backgroundColor:' + _json.dumps(df_colors) + '},')
     p.append('{label:"Meta ' + str(df_meta) + '%",data:' + _json.dumps(meta_line) + ',type:"line",borderColor:"#c0392b",borderWidth:2,borderDash:[5,5],pointRadius:0,fill:false}]')
     p.append('},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100}},plugins:{legend:{position:"top"}}}});')
-
+ 
     # Pareto Chart
     p.append('const paretoCtx=document.getElementById("paretoChart").getContext("2d");')
     p.append('new Chart(paretoCtx,{type:"bar",data:{')
@@ -915,7 +915,7 @@ def generate_report(a):
     p.append('datasets:[{label:"Falhas",data:' + _json.dumps(a['pareto_values']) + ',backgroundColor:"rgba(42,82,152,0.8)",yAxisID:"y"},')
     p.append('{label:"% Acumulado",data:' + _json.dumps(a['pareto_cumulative']) + ',type:"line",borderColor:"#e74c3c",borderWidth:2,pointRadius:4,yAxisID:"y1"}]')
     p.append('},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,position:"left"},y1:{beginAtZero:true,max:100,position:"right",grid:{drawOnChartArea:false}}}}});')
-
+ 
     # Equipment Chart (hours)
     p.append('const eqCtx=document.getElementById("eqChart").getContext("2d");')
     p.append('new Chart(eqCtx,{type:"bar",data:{')
@@ -923,14 +923,14 @@ def generate_report(a):
     eq_colors = ['#e74c3c' if v > 5 else '#f39c12' if v > 2 else '#27ae60' for v in a['eq_chart_values']]
     p.append('datasets:[{label:"Horas Paradas",data:' + _json.dumps(a['eq_chart_values']) + ',backgroundColor:' + _json.dumps(eq_colors) + '}]')
     p.append('},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});')
-
+ 
     # Daily Chart
     p.append('const dailyCtx=document.getElementById("dailyChart").getContext("2d");')
     p.append('new Chart(dailyCtx,{type:"line",data:{')
     p.append('labels:' + _json.dumps(a['daily_labels'], ensure_ascii=False) + ',')
     p.append('datasets:[{label:"Falhas/Dia",data:' + _json.dumps(a['daily_values']) + ',borderColor:"#2a5298",backgroundColor:"rgba(42,82,152,0.1)",fill:true,tension:0.3}]')
     p.append('},options:{responsive:true,maintainAspectRatio:false}});')
-
+ 
     # DF per Equipment Chart
     df_labels = [str(e['equipment']) for e in a['all_eq_df']]
     df_vals = [e['df'] for e in a['all_eq_df']]
@@ -940,9 +940,9 @@ def generate_report(a):
     p.append('labels:' + _json.dumps(df_labels, ensure_ascii=False) + ',')
     p.append('datasets:[{label:"DF %",data:' + _json.dumps(df_vals) + ',backgroundColor:' + _json.dumps(df_colors2) + '}]')
     p.append('},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100}}}});')
-
+ 
     p.append('</script>')
-
+ 
     # PDF Download Script
     pdf_filename = 'Relatorio_Confiabilidade_' + datetime.now().strftime('%Y%m%d') + '.pdf'
     p.append('<script>')
@@ -959,16 +959,16 @@ def generate_report(a):
     p.append('html2pdf().set(opt).from(el).save().then(function(){')
     p.append('btn.textContent="Baixar PDF";btn.disabled=false;});')
     p.append('}</script>')
-
+ 
     p.append('</div></body></html>')
-
+ 
     return '\n'.join(p)
-
-
+ 
+ 
 @app.route('/')
 def index():
     return render_template('index.html')
-
+ 
 @app.route('/api/upload', methods=['POST'])
 def upload():
     try:
@@ -979,27 +979,27 @@ def upload():
             return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
         if not allowed_file(file.filename):
             return jsonify({'success': False, 'error': 'Apenas arquivos .xlsx são permitidos'}), 400
-
+ 
         df_meta = parse_df_meta(request.form.get('df_meta', '90.50'))
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-
+ 
         analysis, error = process_excel(filepath, df_meta)
         try:
             os.remove(filepath)
         except:
             pass
-
+ 
         if error:
             return jsonify({'success': False, 'error': error}), 400
-
+ 
         html_report = generate_report(analysis)
         return jsonify({'success': True, 'report': html_report}), 200
-
+ 
     except Exception as e:
         return jsonify({'success': False, 'error': 'Erro no servidor: {}'.format(str(e))}), 500
-
-
+ 
+ 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

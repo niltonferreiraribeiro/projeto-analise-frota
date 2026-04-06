@@ -393,8 +393,9 @@ def get_pareto_data(sys_failures, top_n=8):
     return top + [others], []
 
 
-def generate_report(data):
+def generate_report(data, custom_meta=None):
     """Generate complete HTML dashboard with fleet selector"""
+    meta = custom_meta if custom_meta else DF_META_BY_FLEET
     p = []
 
     p.append('<!DOCTYPE html>')
@@ -484,7 +485,8 @@ def generate_report(data):
     p.append('<div class="header">')
     p.append('<h1>Relatório de Confiabilidade</h1>')
     p.append('<div class="subtitle">Março 2026 | Frota de <span id="header-fleet">Motoniveladoras</span> GMO</div>')
-    p.append('<div class="meta-info">Meta de DF: <span id="meta-df">72,00%</span></div>')
+    moto_meta_display = '{:.2f}'.format(meta['moto']).replace('.', ',')
+    p.append('<div class="meta-info">Meta de DF: <span id="meta-df">{}%</span></div>'.format(moto_meta_display))
     p.append('<div class="fleet-selector">')
     p.append('<label for="fleet-select">Selecione a Frota:</label>')
     p.append('<select id="fleet-select" onchange="changeFleet(this.value)">')
@@ -500,8 +502,8 @@ def generate_report(data):
     p.append('<button class="pdf-btn" onclick="downloadPDF()">Baixar PDF</button>')
     p.append('</div>')
 
-    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras', DF_META_BY_FLEET['moto']))
-    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras', DF_META_BY_FLEET['esc']))
+    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras', meta['moto']))
+    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras', meta['esc']))
 
     p.append('</div>')
 
@@ -515,20 +517,25 @@ def generate_report(data):
     p.append('  document.querySelectorAll(".fleet-content").forEach(el => el.classList.remove("active"));')
     p.append('  document.getElementById("fleet_" + fleetId).classList.add("active");')
     p.append('  var names = {"moto": "Motoniveladoras", "esc": "Escavadeiras"};')
-    p.append('  var metas = {"moto": "72,00%", "esc": "90,50%"};')
+    moto_meta_str = '{:.2f}'.format(meta['moto']).replace('.', ',')
+    esc_meta_str = '{:.2f}'.format(meta['esc']).replace('.', ',')
+    p.append('  var metas = {{"moto": "{}%", "esc": "{}%"}};'.format(moto_meta_str, esc_meta_str))
     p.append('  document.getElementById("header-fleet").textContent = names[fleetId] || fleetId;')
     p.append('  document.getElementById("meta-df").textContent = metas[fleetId] || "90,50%";')
     p.append('}')
     p.append('function downloadPDF() {')
-    p.append('  var element = document.querySelector(".container");')
+    p.append('  var active = document.querySelector(".fleet-content.active");')
+    p.append('  if (!active) { alert("Selecione uma frota"); return; }')
+    p.append('  var sel = document.getElementById("fleet-select");')
+    p.append('  var fname = "relatorio_" + sel.options[sel.selectedIndex].text + ".pdf";')
     p.append('  var opt = {')
     p.append('    margin: 10,')
-    p.append('    filename: "relatorio_confiabilidade.pdf",')
+    p.append('    filename: fname,')
     p.append('    image: { type: "jpeg", quality: 0.98 },')
     p.append('    html2canvas: { scale: 2 },')
     p.append('    jsPDF: { orientation: "landscape", unit: "mm", format: "a4" }')
     p.append('  };')
-    p.append('  html2pdf().set(opt).from(element).save();')
+    p.append('  html2pdf().set(opt).from(active).save();')
     p.append('}')
     p.append('</script>')
 
@@ -1216,6 +1223,14 @@ def index():
             .file-input-label:hover { background: #f0f0f0; border-color: #2d5a7a; }
             .file-input-label.active { background: #e8f0ff; border-color: #1a3a52; }
             .file-name { margin-top: 10px; color: #27ae60; font-size: 14px; }
+            .meta-section { background: #f0f4f8; border: 1px solid #d0d8e0; border-radius: 6px; padding: 20px; margin-bottom: 25px; }
+            .meta-section h3 { color: #1a3a52; font-size: 16px; margin-bottom: 15px; }
+            .meta-row { display: flex; gap: 20px; }
+            .meta-field { flex: 1; }
+            .meta-field label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+            .meta-field input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+            .meta-field input:focus { outline: none; border-color: #1a3a52; box-shadow: 0 0 0 2px rgba(26,58,82,0.15); }
+            .meta-field .hint { font-size: 11px; color: #888; margin-top: 4px; }
             .submit-btn { background: linear-gradient(135deg, #1a3a52 0%, #2d5a7a 100%); color: white; padding: 14px 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: transform 0.2s; }
             .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26, 58, 82, 0.3); }
             .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -1237,6 +1252,21 @@ def index():
                             <strong>Clique para selecionar</strong><br>ou arraste o arquivo aqui
                         </label>
                         <div class="file-name" id="fileName"></div>
+                    </div>
+                </div>
+                <div class="meta-section">
+                    <h3>Meta de DF por Frota</h3>
+                    <div class="meta-row">
+                        <div class="meta-field">
+                            <label>Motoniveladora (%)</label>
+                            <input type="number" id="metaMoto" name="meta_moto" value="72.00" step="0.01" min="0" max="100">
+                            <div class="hint">Padrao: 72,00%</div>
+                        </div>
+                        <div class="meta-field">
+                            <label>Escavadeira (%)</label>
+                            <input type="number" id="metaEsc" name="meta_esc" value="90.50" step="0.01" min="0" max="100">
+                            <div class="hint">Padrao: 90,50%</div>
+                        </div>
                     </div>
                 </div>
                 <button type="submit" class="submit-btn" id="submitBtn">Processar Relatorio</button>
@@ -1285,6 +1315,8 @@ def index():
 
                 var formData = new FormData();
                 formData.append("file", fileInput.files[0]);
+                formData.append("meta_moto", document.getElementById("metaMoto").value);
+                formData.append("meta_esc", document.getElementById("metaEsc").value);
 
                 document.getElementById("submitBtn").disabled = true;
                 document.getElementById("loading").style.display = "block";
@@ -1333,8 +1365,21 @@ def upload_file():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
+        meta_moto = request.form.get('meta_moto', '72.0')
+        meta_esc = request.form.get('meta_esc', '90.50')
+        try:
+            meta_moto = float(meta_moto)
+        except (ValueError, TypeError):
+            meta_moto = 72.0
+        try:
+            meta_esc = float(meta_esc)
+        except (ValueError, TypeError):
+            meta_esc = 90.50
+
+        custom_meta = {'moto': meta_moto, 'esc': meta_esc}
+
         data = process_excel(filepath)
-        html_report = generate_report(data)
+        html_report = generate_report(data, custom_meta)
 
         report_id = str(int(__import__('time').time() * 1000))
         report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'report_' + report_id + '.html')

@@ -12,7 +12,11 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = '/tmp'
 
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
-DF_META = 90.50
+
+DF_META_BY_FLEET = {
+    'moto': 72.0,
+    'esc': 90.50
+}
 
 SYSTEM_NORMALIZE = {
     'hidraulico': 'Hidráulico', 'hidráulico': 'Hidráulico', 'Hidraulico': 'Hidráulico', 'Hidraúlico': 'Hidráulico', 'hidraúlico': 'Hidráulico',
@@ -480,7 +484,7 @@ def generate_report(data):
     p.append('<div class="header">')
     p.append('<h1>Relatório de Confiabilidade</h1>')
     p.append('<div class="subtitle">Março 2026 | Frota de <span id="header-fleet">Motoniveladoras</span> GMO</div>')
-    p.append('<div class="meta-info">Meta de DF: 90,50%</div>')
+    p.append('<div class="meta-info">Meta de DF: <span id="meta-df">72,00%</span></div>')
     p.append('<div class="fleet-selector">')
     p.append('<label for="fleet-select">Selecione a Frota:</label>')
     p.append('<select id="fleet-select" onchange="changeFleet(this.value)">')
@@ -496,8 +500,8 @@ def generate_report(data):
     p.append('<button class="pdf-btn" onclick="downloadPDF()">Baixar PDF</button>')
     p.append('</div>')
 
-    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras'))
-    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras'))
+    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras', DF_META_BY_FLEET['moto']))
+    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras', DF_META_BY_FLEET['esc']))
 
     p.append('</div>')
 
@@ -511,7 +515,9 @@ def generate_report(data):
     p.append('  document.querySelectorAll(".fleet-content").forEach(el => el.classList.remove("active"));')
     p.append('  document.getElementById("fleet_" + fleetId).classList.add("active");')
     p.append('  var names = {"moto": "Motoniveladoras", "esc": "Escavadeiras"};')
+    p.append('  var metas = {"moto": "72,00%", "esc": "90,50%"};')
     p.append('  document.getElementById("header-fleet").textContent = names[fleetId] || fleetId;')
+    p.append('  document.getElementById("meta-df").textContent = metas[fleetId] || "90,50%";')
     p.append('}')
     p.append('function downloadPDF() {')
     p.append('  var element = document.querySelector(".container");')
@@ -532,7 +538,7 @@ def generate_report(data):
     return ''.join(p)
 
 
-def generate_fleet_tab(fleet_data, tab_id, fleet_name):
+def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     """Generate content for a fleet dashboard - split by month"""
     p = []
 
@@ -602,9 +608,9 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
 
     total_failures_prev = len(failures_prev)
 
-    df_above_meta_prev = 'ACIMA' if avg_fleet_df_prev >= DF_META else 'ABAIXO'
-    df_color_prev = '#27ae60' if avg_fleet_df_prev >= DF_META else '#e74c3c'
-    status_class_prev = 'above' if avg_fleet_df_prev >= DF_META else 'below'
+    df_above_meta_prev = 'ACIMA' if avg_fleet_df_prev >= df_meta else 'ABAIXO'
+    df_color_prev = '#27ae60' if avg_fleet_df_prev >= df_meta else '#e74c3c'
+    status_class_prev = 'above' if avg_fleet_df_prev >= df_meta else 'below'
 
     if last_7_days_df > 95:
         trend_status = 'EXCELENTE'
@@ -649,13 +655,13 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
 
     critical_patterns = get_critical_failures(failures_prev, eq_hours, 3)
     num_critical = len([p2 for p2 in critical_patterns if p2[2] > 3])
-    if avg_fleet_df_prev >= DF_META:
+    if avg_fleet_df_prev >= df_meta:
         if num_critical > 0:
-            status_text = 'BOAS NOTICIAS: A frota esta <strong>acima da meta</strong> de DF ({:.2f}% vs {:.2f}%). Porem, identificamos <strong>{} padroes de falhas criticas</strong> que precisam acao imediata para evitar quedas na proxima semana.'.format(avg_fleet_df_prev, DF_META, num_critical)
+            status_text = 'BOAS NOTICIAS: A frota esta <strong>acima da meta</strong> de DF ({:.2f}% vs {:.2f}%). Porem, identificamos <strong>{} padroes de falhas criticas</strong> que precisam acao imediata para evitar quedas na proxima semana.'.format(avg_fleet_df_prev, df_meta, num_critical)
         else:
-            status_text = 'BOAS NOTICIAS: A frota esta <strong>acima da meta</strong> de DF ({:.2f}% vs {:.2f}%). Desempenho dentro dos parametros esperados.'.format(avg_fleet_df_prev, DF_META)
+            status_text = 'BOAS NOTICIAS: A frota esta <strong>acima da meta</strong> de DF ({:.2f}% vs {:.2f}%). Desempenho dentro dos parametros esperados.'.format(avg_fleet_df_prev, df_meta)
     else:
-        status_text = 'ATENCAO: A frota esta <strong>abaixo da meta</strong> de DF ({:.2f}% vs {:.2f}%). Recomenda-se intensificar manutencao preventiva e investigar causas das falhas criticas.'.format(avg_fleet_df_prev, DF_META)
+        status_text = 'ATENCAO: A frota esta <strong>abaixo da meta</strong> de DF ({:.2f}% vs {:.2f}%). Recomenda-se intensificar manutencao preventiva e investigar causas das falhas criticas.'.format(avg_fleet_df_prev, df_meta)
     p.append('<div class="status-comment">')
     p.append('<strong>Status Geral:</strong> ' + status_text)
     p.append('</div>')
@@ -681,7 +687,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
         if df_val < min_daily_avg:
             min_daily_avg = df_val
             min_date = date_key
-        if df_val >= DF_META:
+        if df_val >= df_meta:
             days_above += 1
         else:
             days_below += 1
@@ -689,7 +695,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
     total_days = days_above + days_below
 
     p.append('<div class="metric-item"><span class="metric-label">DF Media:</span><span class="metric-value">{:.2f}%</span></div>'.format(avg_fleet_df_prev))
-    p.append('<div class="metric-item"><span class="metric-label">Comparacao a meta:</span><span class="metric-value">{:.2f}% {} da meta</span></div>'.format(abs(avg_fleet_df_prev - DF_META), df_above_meta_prev))
+    p.append('<div class="metric-item"><span class="metric-label">Comparacao a meta:</span><span class="metric-value">{:.2f}% {} da meta</span></div>'.format(abs(avg_fleet_df_prev - df_meta), df_above_meta_prev))
 
     max_date_str = datetime.strptime(max_date, '%Y-%m-%d').strftime('%d/%m') if max_date else 'N/A'
     p.append('<div class="metric-item"><span class="metric-label">DF Maxima:</span><span class="metric-value">{:.2f}% ({}) </span></div>'.format(max_daily_avg, max_date_str))
@@ -707,7 +713,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
     p.append('<div class="subsection">')
     p.append('<h3>Ultimos 7 Dias (Tendencia)</h3>')
 
-    days_above_7 = sum(1 for val in last_7_fleet_vals if val >= DF_META)
+    days_above_7 = sum(1 for val in last_7_fleet_vals if val >= df_meta)
 
     if len(last_7_fleet_vals) >= 2:
         first_5_days = sum(last_7_fleet_vals[:5]) / 5 if len(last_7_fleet_vals) >= 5 else sum(last_7_fleet_vals[:2]) / 2
@@ -779,7 +785,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
 
     dates_json = _json.dumps(sorted_fleet_dates_all)
     df_json = _json.dumps(df_chart_values)
-    meta_json = _json.dumps([DF_META] * len(sorted_fleet_dates_all))
+    meta_json = _json.dumps([df_meta] * len(sorted_fleet_dates_all))
 
     p.append('new Chart(ctx_df_{}, {{'.format(tab_id))
     p.append('  type: "line",')
@@ -795,7 +801,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
     p.append('        tension: 0.3')
     p.append('      },')
     p.append('      {')
-    p.append('        label: "Meta (' + str(DF_META) + '%)",')
+    p.append('        label: "Meta (' + str(df_meta) + '%)",')
     p.append('        data: ' + meta_json + ',')
     p.append('        borderColor: "#e74c3c",')
     p.append('        borderDash: [5, 5],')
@@ -1168,7 +1174,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name):
     p.append('A frota de <strong>{}</strong> registrou <strong>{} falhas corretivas</strong> em {}, '.format(fleet_name, total_failures_prev, prev_month_name))
     total_hours_prev = sum(f['duracao'] for f in failures_prev) / 3600.0
     p.append('totalizando <strong>{:.1f} horas paradas</strong>. '.format(total_hours_prev))
-    p.append('O DF medio da frota foi de <strong style="color: {};">{:.2f}%</strong> (<strong style="color: {};">{}</strong>, meta: {}%). '.format(df_color_prev, avg_fleet_df_prev, df_color_prev, df_above_meta_prev, DF_META))
+    p.append('O DF medio da frota foi de <strong style="color: {};">{:.2f}%</strong> (<strong style="color: {};">{}</strong>, meta: {}%). '.format(df_color_prev, avg_fleet_df_prev, df_color_prev, df_above_meta_prev, df_meta))
     if critical_prev:
         p.append('As principais falhas criticas foram no sistema <strong>{}</strong> com {:.1f}h de parada. '.format(critical_prev[0][0], critical_prev[0][2]))
     p.append('</p>')

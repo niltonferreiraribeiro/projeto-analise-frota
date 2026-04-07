@@ -331,7 +331,7 @@ def process_excel(filepath):
     esc_eq = ['9401', '9402', '9403', '9404', '9405', '9406', '9407']
 
     moto_data = process_fleet(wb['Motoniveladora'], 0, 'MM', moto_eq)
-    esc_data = process_fleet(wb['Escavadeira'], 1, 'EX', esc_eq)
+    esc_data = process_fleet(wb['Escavadeira'], 1, 'EM', esc_eq)
 
     moto_daily_df, moto_eq_avg, moto_fleet_df, moto_acum = process_df_sheet(wb['DF MOTO'], moto_eq)
     esc_daily_df, esc_eq_avg, esc_fleet_df, esc_acum = process_df_sheet(wb['DF ESCAVADEIRA'], esc_eq)
@@ -637,7 +637,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('<div class="kpi-row">')
 
     p.append('<div class="kpi-card">')
-    p.append('<div class="kpi-label">DF MEDIA (MES)</div>')
+    p.append('<div class="kpi-label">DF ACUMULADA (MES)</div>')
     p.append('<div class="kpi-value">{:.2f}<span class="kpi-unit">%</span></div>'.format(avg_fleet_df_prev))
     p.append('<span class="kpi-status {}">{} da meta</span>'.format(status_class_prev, df_above_meta_prev))
     p.append('</div>')
@@ -701,7 +701,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
 
     total_days = days_above + days_below
 
-    p.append('<div class="metric-item"><span class="metric-label">DF Media:</span><span class="metric-value">{:.2f}%</span></div>'.format(avg_fleet_df_prev))
+    p.append('<div class="metric-item"><span class="metric-label">DF Acumulada:</span><span class="metric-value">{:.2f}%</span></div>'.format(avg_fleet_df_prev))
     p.append('<div class="metric-item"><span class="metric-label">Comparacao a meta:</span><span class="metric-value">{:.2f}% {} da meta</span></div>'.format(abs(avg_fleet_df_prev - df_meta), df_above_meta_prev))
 
     max_date_str = datetime.strptime(max_date, '%Y-%m-%d').strftime('%d/%m') if max_date else 'N/A'
@@ -736,7 +736,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
         trend_text = 'DADOS INSUFICIENTES'
         trend_change = 0
 
-    p.append('<div class="metric-item"><span class="metric-label">DF Media ultimos 7 dias:</span><span class="metric-value">{:.2f}%</span></div>'.format(last_7_days_df))
+    p.append('<div class="metric-item"><span class="metric-label">DF Acumulada ultimos 7 dias:</span><span class="metric-value">{:.2f}%</span></div>'.format(last_7_days_df))
     p.append('<div class="metric-item"><span class="metric-label">Tendencia:</span><span class="metric-value">{} ({:+.1f}%)</span></div>'.format(trend_text, trend_change))
     p.append('<div class="metric-item"><span class="metric-label">Dias acima da meta:</span><span class="metric-value">{} de 7</span></div>'.format(days_above_7))
 
@@ -832,7 +832,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('<div class="section">')
     p.append('<h2>Falhas</h2>')
 
-    prefix = 'MM' if tab_id == 'moto' else 'EX'
+    prefix = 'MM' if tab_id == 'moto' else 'EM'
     prev_month_name = MONTH_NAMES.get(prev_month, '')
 
     p.append('<div class="subsection">')
@@ -1170,10 +1170,6 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
         p.append('</script>')
         p.append('</div>')
 
-        p.append('</div>')
-
-    p.append('</div>')
-
     p.append('<div class="section">')
     p.append('<h2>Conclusao - {}</h2>'.format(fleet_name))
     p.append('<div style="padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 6px;">')
@@ -1181,7 +1177,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('A frota de <strong>{}</strong> registrou <strong>{} falhas corretivas</strong> em {}, '.format(fleet_name, total_failures_prev, prev_month_name))
     total_hours_prev = sum(f['duracao'] for f in failures_prev) / 3600.0
     p.append('totalizando <strong>{:.1f} horas paradas</strong>. '.format(total_hours_prev))
-    p.append('O DF medio da frota foi de <strong style="color: {};">{:.2f}%</strong> (<strong style="color: {};">{}</strong>, meta: {}%). '.format(df_color_prev, avg_fleet_df_prev, df_color_prev, df_above_meta_prev, df_meta))
+    p.append('O DF acumulado da frota foi de <strong style="color: {};">{:.2f}%</strong> (<strong style="color: {};">{}</strong>, meta: {}%). '.format(df_color_prev, avg_fleet_df_prev, df_color_prev, df_above_meta_prev, df_meta))
     if critical_prev:
         p.append('As principais falhas criticas foram no sistema <strong>{}</strong> com {:.1f}h de parada. '.format(critical_prev[0][0], critical_prev[0][2]))
     p.append('</p>')
@@ -1189,7 +1185,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('</div>')
     p.append('</div>')
 
-    p.append('</div>')
+    p.append('</div>')  # closes fleet-content div
 
     return ''.join(p)
 

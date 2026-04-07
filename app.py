@@ -393,9 +393,83 @@ def get_pareto_data(sys_failures, top_n=8):
     return top + [others], []
 
 
-def generate_report(data, custom_meta=None):
+def generate_upload_section():
+    """Generate the upload form section for the bottom of the page"""
+    p = []
+    p.append('<div id="upload-section" style="background: #1a3a52; padding: 40px; margin-top: 40px;">')
+    p.append('<div style="max-width: 800px; margin: 0 auto;">')
+    p.append('<h2 style="color: white; margin-bottom: 20px; font-size: 22px;">Atualizar Dados</h2>')
+    p.append('<form id="uploadForm" enctype="multipart/form-data">')
+
+    p.append('<div style="display: flex; gap: 20px; margin-bottom: 20px;">')
+
+    p.append('<div style="flex: 1; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 6px;">')
+    p.append('<label style="color: white; display: block; margin-bottom: 8px; font-weight: 600;">Base de Dados (Indicadores)</label>')
+    p.append('<input type="file" id="fileInput" name="file" accept=".xlsx,.xls" required style="color: white; width: 100%;">')
+    p.append('<div style="color: rgba(255,255,255,0.6); font-size: 11px; margin-top: 6px;">Excel com abas: Motoniveladora, Escavadeira, DF MOTO, DF ESCAVADEIRA</div>')
+    p.append('</div>')
+
+    p.append('<div style="flex: 1; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 6px;">')
+    p.append('<label style="color: white; display: block; margin-bottom: 8px; font-weight: 600;">Plano de Acao (opcional)</label>')
+    p.append('<input type="file" id="filePA" name="file_pa" accept=".xlsx,.xls" style="color: white; width: 100%;">')
+    p.append('<div style="color: rgba(255,255,255,0.6); font-size: 11px; margin-top: 6px;">Excel com aba Plano de Acao atualizado apos reuniao</div>')
+    p.append('</div>')
+
+    p.append('</div>')
+
+    p.append('<div style="display: flex; gap: 20px; margin-bottom: 20px;">')
+    p.append('<div style="flex: 1;">')
+    p.append('<label style="color: white; display: block; margin-bottom: 6px; font-size: 13px;">Meta DF Motoniveladora (%)</label>')
+    p.append('<input type="number" id="metaMoto" name="meta_moto" value="72.00" step="0.01" min="0" max="100" style="width: 100%; padding: 10px; border: none; border-radius: 4px; font-size: 14px;">')
+    p.append('</div>')
+    p.append('<div style="flex: 1;">')
+    p.append('<label style="color: white; display: block; margin-bottom: 6px; font-size: 13px;">Meta DF Escavadeira (%)</label>')
+    p.append('<input type="number" id="metaEsc" name="meta_esc" value="90.50" step="0.01" min="0" max="100" style="width: 100%; padding: 10px; border: none; border-radius: 4px; font-size: 14px;">')
+    p.append('</div>')
+    p.append('</div>')
+
+    p.append('<button type="submit" id="submitBtn" style="background: #27ae60; color: white; padding: 14px 40px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: background 0.3s;">Processar e Atualizar Relatorio</button>')
+    p.append('<div id="loading" style="display: none; text-align: center; color: white; margin-top: 20px;">')
+    p.append('<div style="border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px;"></div>')
+    p.append('<p>Processando dados...</p>')
+    p.append('</div>')
+
+    p.append('</form>')
+    p.append('</div>')
+    p.append('</div>')
+
+    p.append('<style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>')
+
+    p.append('<script>')
+    p.append('document.getElementById("uploadForm").addEventListener("submit", function(e) {')
+    p.append('  e.preventDefault();')
+    p.append('  var fileInput = document.getElementById("fileInput");')
+    p.append('  if (!fileInput.files.length) { alert("Selecione a base de dados"); return; }')
+    p.append('  var formData = new FormData();')
+    p.append('  formData.append("file", fileInput.files[0]);')
+    p.append('  var filePA = document.getElementById("filePA");')
+    p.append('  if (filePA.files.length) { formData.append("file_pa", filePA.files[0]); }')
+    p.append('  formData.append("meta_moto", document.getElementById("metaMoto").value);')
+    p.append('  formData.append("meta_esc", document.getElementById("metaEsc").value);')
+    p.append('  document.getElementById("submitBtn").disabled = true;')
+    p.append('  document.getElementById("loading").style.display = "block";')
+    p.append('  fetch("/api/upload", { method: "POST", body: formData })')
+    p.append('  .then(function(r) { return r.json(); })')
+    p.append('  .then(function(data) {')
+    p.append('    if (data.success) { window.location.href = "/"; }')
+    p.append('    else { alert("Erro: " + data.error); document.getElementById("submitBtn").disabled = false; document.getElementById("loading").style.display = "none"; }')
+    p.append('  })')
+    p.append('  .catch(function(err) { alert("Erro: " + err.message); document.getElementById("submitBtn").disabled = false; document.getElementById("loading").style.display = "none"; });')
+    p.append('});')
+    p.append('</script>')
+
+    return ''.join(p)
+
+
+def generate_report(data, custom_meta=None, last_update_date=None):
     """Generate complete HTML dashboard with fleet selector"""
     meta = custom_meta if custom_meta else DF_META_BY_FLEET
+    update_str = last_update_date if last_update_date else datetime.now().strftime('%d/%m/%Y')
     p = []
 
     p.append('<!DOCTYPE html>')
@@ -484,9 +558,9 @@ def generate_report(data, custom_meta=None):
 
     p.append('<div class="header">')
     p.append('<h1>Relatório de Confiabilidade</h1>')
-    p.append('<div class="subtitle">Março 2026 | Frota de <span id="header-fleet">Motoniveladoras</span> GMO</div>')
+    p.append('<div class="subtitle">Frota de <span id="header-fleet">Motoniveladoras</span> GMO</div>')
     moto_meta_display = '{:.2f}'.format(meta['moto']).replace('.', ',')
-    p.append('<div class="meta-info">Meta de DF: <span id="meta-df">{}%</span></div>'.format(moto_meta_display))
+    p.append('<div class="meta-info">Meta de DF: <span id="meta-df">{}%</span> | Ultima atualizacao: {}</div>'.format(moto_meta_display, update_str))
     p.append('<div class="fleet-selector">')
     p.append('<label for="fleet-select">Selecione a Frota:</label>')
     p.append('<select id="fleet-select" onchange="changeFleet(this.value)">')
@@ -509,8 +583,10 @@ def generate_report(data, custom_meta=None):
 
     p.append('<div class="footer">')
     p.append('Engenharia de Manutenção e Confiabilidade - Setor GRD<br>')
-    p.append('Relatório automático gerado em ' + datetime.now().strftime('%d/%m/%Y às %H:%M:%S'))
+    p.append('Relatório gerado em ' + datetime.now().strftime('%d/%m/%Y às %H:%M:%S') + ' | Dados atualizados ate: ' + update_str)
     p.append('</div>')
+
+    p.append(generate_upload_section())
 
     p.append('<script>')
     p.append('function changeFleet(fleetId) {')
@@ -594,24 +670,20 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     elif acumulado is not None:
         avg_fleet_df_prev = acumulado
 
-    last_7_fleet_vals = []
+    curr_month_vals = list(df_dates_curr.values()) if df_dates_curr else []
     sorted_fleet_dates = sorted(fleet_daily_df.keys())
-    if len(sorted_fleet_dates) >= 7:
-        for i in range(-7, 0):
-            last_7_fleet_vals.append(fleet_daily_df[sorted_fleet_dates[i]])
-    elif sorted_fleet_dates:
-        last_7_fleet_vals = [fleet_daily_df[k] for k in sorted_fleet_dates]
 
-    last_7_days_df = 0
-    if last_7_fleet_vals:
-        last_7_days_df = sum(last_7_fleet_vals) / len(last_7_fleet_vals)
+    curr_month_df = 0
+    if curr_month_vals:
+        curr_month_df = sum(curr_month_vals) / len(curr_month_vals)
 
-    failures_last_7_days = 0
-    if sorted_fleet_dates:
-        last_7_dates_set = set(sorted_fleet_dates[-7:] if len(sorted_fleet_dates) >= 7 else sorted_fleet_dates)
-        for f in failures:
-            if f['data'].strftime('%Y-%m-%d') in last_7_dates_set:
-                failures_last_7_days += 1
+    failures_curr_month = len(failures_curr)
+
+    curr_month_days = len(curr_month_vals)
+    last_curr_date = ''
+    if df_dates_curr:
+        last_curr_key = max(df_dates_curr.keys())
+        last_curr_date = datetime.strptime(last_curr_key, '%Y-%m-%d').strftime('%d/%m')
 
     total_failures_prev = len(failures_prev)
 
@@ -619,13 +691,13 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     df_color_prev = '#27ae60' if avg_fleet_df_prev >= df_meta else '#e74c3c'
     status_class_prev = 'above' if avg_fleet_df_prev >= df_meta else 'below'
 
-    if last_7_days_df > 95:
+    if curr_month_df > 95:
         trend_status = 'EXCELENTE'
         trend_class = 'excellent'
-    elif last_7_days_df > 90:
+    elif curr_month_df > 90:
         trend_status = 'BOM'
         trend_class = 'good'
-    elif last_7_days_df > 80:
+    elif curr_month_df > 80:
         trend_status = 'ATENCAO'
         trend_class = 'attention'
     else:
@@ -633,29 +705,33 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
         trend_class = 'critical'
 
     p.append('<div class="section">')
-    p.append('<h2 style="color: #e67e22; border-bottom-color: #e67e22;">&#9889; Resumo Executivo</h2>')
+    prev_month_name = MONTH_NAMES.get(prev_month, '')
+    curr_month_name = MONTH_NAMES.get(current_month, '')
+
+    p.append('<h2 style="color: #e67e22; border-bottom-color: #e67e22;">&#9889; Resumo Executivo - {} (Completo)</h2>'.format(prev_month_name))
     p.append('<div class="kpi-row">')
 
     p.append('<div class="kpi-card">')
-    p.append('<div class="kpi-label">DF ACUMULADA (MES)</div>')
+    p.append('<div class="kpi-label">DF ACUMULADA {}</div>'.format(prev_month_name.upper()))
     p.append('<div class="kpi-value">{:.2f}<span class="kpi-unit">%</span></div>'.format(avg_fleet_df_prev))
     p.append('<span class="kpi-status {}">{} da meta</span>'.format(status_class_prev, df_above_meta_prev))
     p.append('</div>')
 
+    curr_label = '{} (Parcial - {} dias ate {})'.format(curr_month_name.upper(), curr_month_days, last_curr_date) if curr_month_days > 0 else curr_month_name.upper() + ' (Sem dados)'
     p.append('<div class="kpi-card">')
-    p.append('<div class="kpi-label">DF ULTIMOS 7 DIAS</div>')
-    p.append('<div class="kpi-value">{:.2f}<span class="kpi-unit">%</span></div>'.format(last_7_days_df))
+    p.append('<div class="kpi-label">DF ACUMULADA {}</div>'.format(curr_label))
+    p.append('<div class="kpi-value">{:.2f}<span class="kpi-unit">%</span></div>'.format(curr_month_df))
     p.append('<span class="kpi-status {}">{}</span>'.format(trend_class, trend_status))
     p.append('</div>')
 
     p.append('<div class="kpi-card">')
-    p.append('<div class="kpi-label">TOTAL DE FALHAS</div>')
+    p.append('<div class="kpi-label">FALHAS {}</div>'.format(prev_month_name.upper()))
     p.append('<div class="kpi-value">{}</div>'.format(total_failures_prev))
     p.append('</div>')
 
     p.append('<div class="kpi-card">')
-    p.append('<div class="kpi-label">FALHAS (7 DIAS)</div>')
-    p.append('<div class="kpi-value">{}</div>'.format(failures_last_7_days))
+    p.append('<div class="kpi-label">FALHAS {} (PARCIAL)</div>'.format(curr_month_name.upper()))
+    p.append('<div class="kpi-value">{}</div>'.format(failures_curr_month))
     p.append('</div>')
 
     p.append('</div>')
@@ -675,10 +751,10 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('</div>')
 
     p.append('<div class="section">')
-    p.append('<h2>Disponibilidade Fisica (DF)</h2>')
+    p.append('<h2>Disponibilidade Fisica (DF) - {}</h2>'.format(prev_month_name))
 
     p.append('<div class="subsection">')
-    p.append('<h3>Performance do Mes</h3>')
+    p.append('<h3>Performance de {} (Completo)</h3>'.format(prev_month_name))
 
     min_daily_avg = 100
     min_date = None
@@ -718,14 +794,15 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('</div>')
 
     p.append('<div class="subsection">')
-    p.append('<h3>Ultimos 7 Dias (Tendencia)</h3>')
+    p.append('<h3>{} - Mes Atual (Parcial - {} dias)</h3>'.format(curr_month_name, curr_month_days))
 
-    days_above_7 = sum(1 for val in last_7_fleet_vals if val >= df_meta)
+    days_above_curr = sum(1 for val in curr_month_vals if val >= df_meta)
 
-    if len(last_7_fleet_vals) >= 2:
-        first_5_days = sum(last_7_fleet_vals[:5]) / 5 if len(last_7_fleet_vals) >= 5 else sum(last_7_fleet_vals[:2]) / 2
-        last_2_days = sum(last_7_fleet_vals[-2:]) / 2
-        trend_change = last_2_days - first_5_days
+    if len(curr_month_vals) >= 2:
+        half = len(curr_month_vals) // 2
+        first_half = sum(curr_month_vals[:half]) / half
+        second_half = sum(curr_month_vals[half:]) / (len(curr_month_vals) - half)
+        trend_change = second_half - first_half
         if trend_change > 2:
             trend_text = 'MELHORA CONSISTENTE'
         elif trend_change < -2:
@@ -736,9 +813,10 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
         trend_text = 'DADOS INSUFICIENTES'
         trend_change = 0
 
-    p.append('<div class="metric-item"><span class="metric-label">DF Acumulada ultimos 7 dias:</span><span class="metric-value">{:.2f}%</span></div>'.format(last_7_days_df))
+    p.append('<div class="metric-item"><span class="metric-label">DF Acumulada {} (parcial):</span><span class="metric-value">{:.2f}%</span></div>'.format(curr_month_name, curr_month_df))
     p.append('<div class="metric-item"><span class="metric-label">Tendencia:</span><span class="metric-value">{} ({:+.1f}%)</span></div>'.format(trend_text, trend_change))
-    p.append('<div class="metric-item"><span class="metric-label">Dias acima da meta:</span><span class="metric-value">{} de 7</span></div>'.format(days_above_7))
+    p.append('<div class="metric-item"><span class="metric-label">Dias acima da meta:</span><span class="metric-value">{} de {}</span></div>'.format(days_above_curr, curr_month_days))
+    p.append('<div class="metric-item"><span class="metric-label">Falhas no periodo:</span><span class="metric-value">{}</span></div>'.format(failures_curr_month))
 
     p.append('</div>')
 
@@ -830,7 +908,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('</div>')
 
     p.append('<div class="section">')
-    p.append('<h2>Falhas</h2>')
+    p.append('<h2>Falhas - {} (Completo) + {} (Parcial)</h2>'.format(prev_month_name, curr_month_name))
 
     prefix = 'MM' if tab_id == 'moto' else 'EM'
     prev_month_name = MONTH_NAMES.get(prev_month, '')
@@ -1195,152 +1273,53 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+LATEST_REPORT_PATH = os.path.join('/tmp', 'latest_report.html')
+
+
 @app.route('/')
 def index():
-    """Render initial upload page"""
-    return '''
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Upload - Relatorio de Confiabilidade</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1a3a52 0%, #2d5a7a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-            .upload-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 600px; width: 100%; }
-            .upload-container h1 { color: #1a3a52; margin-bottom: 10px; font-size: 28px; }
-            .upload-container p { color: #666; margin-bottom: 30px; font-size: 14px; line-height: 1.6; }
-            .form-group { margin-bottom: 25px; }
-            .form-group label { display: block; margin-bottom: 10px; color: #333; font-weight: 500; }
-            .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
-            .file-input-wrapper input[type=file] { position: absolute; left: -9999px; }
-            .file-input-label { display: block; padding: 20px; border: 2px dashed #1a3a52; border-radius: 6px; text-align: center; cursor: pointer; transition: all 0.3s; background: #f9f9f9; }
-            .file-input-label:hover { background: #f0f0f0; border-color: #2d5a7a; }
-            .file-input-label.active { background: #e8f0ff; border-color: #1a3a52; }
-            .file-name { margin-top: 10px; color: #27ae60; font-size: 14px; }
-            .meta-section { background: #f0f4f8; border: 1px solid #d0d8e0; border-radius: 6px; padding: 20px; margin-bottom: 25px; }
-            .meta-section h3 { color: #1a3a52; font-size: 16px; margin-bottom: 15px; }
-            .meta-row { display: flex; gap: 20px; }
-            .meta-field { flex: 1; }
-            .meta-field label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
-            .meta-field input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-            .meta-field input:focus { outline: none; border-color: #1a3a52; box-shadow: 0 0 0 2px rgba(26,58,82,0.15); }
-            .meta-field .hint { font-size: 11px; color: #888; margin-top: 4px; }
-            .submit-btn { background: linear-gradient(135deg, #1a3a52 0%, #2d5a7a 100%); color: white; padding: 14px 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: transform 0.2s; }
-            .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26, 58, 82, 0.3); }
-            .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-            .loading { display: none; text-align: center; color: #1a3a52; margin-top: 20px; }
-            .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1a3a52; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        </style>
-    </head>
-    <body>
-        <div class="upload-container">
-            <h1>Relatorio de Confiabilidade</h1>
-            <p>Analyze and generate reliability reports from failure data Excel files. Upload your data file to get started.</p>
-            <form id="uploadForm" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label>Selecione arquivo Excel</label>
-                    <div class="file-input-wrapper">
-                        <input type="file" id="fileInput" name="file" accept=".xlsx,.xls" required>
-                        <label for="fileInput" class="file-input-label" id="fileLabel">
-                            <strong>Clique para selecionar</strong><br>ou arraste o arquivo aqui
-                        </label>
-                        <div class="file-name" id="fileName"></div>
-                    </div>
-                </div>
-                <div class="meta-section">
-                    <h3>Meta de DF por Frota</h3>
-                    <div class="meta-row">
-                        <div class="meta-field">
-                            <label>Motoniveladora (%)</label>
-                            <input type="number" id="metaMoto" name="meta_moto" value="72.00" step="0.01" min="0" max="100">
-                            <div class="hint">Padrao: 72,00%</div>
-                        </div>
-                        <div class="meta-field">
-                            <label>Escavadeira (%)</label>
-                            <input type="number" id="metaEsc" name="meta_esc" value="90.50" step="0.01" min="0" max="100">
-                            <div class="hint">Padrao: 90,50%</div>
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" class="submit-btn" id="submitBtn">Processar Relatorio</button>
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Processando dados...</p>
-                </div>
-            </form>
-        </div>
-        <script>
-            var fileInput = document.getElementById("fileInput");
-            var fileLabel = document.getElementById("fileLabel");
-            var fileName = document.getElementById("fileName");
+    """Show latest report or empty state"""
+    if os.path.exists(LATEST_REPORT_PATH):
+        with open(LATEST_REPORT_PATH, 'r', encoding='utf-8') as f:
+            return f.read()
+    return generate_empty_state()
 
-            fileInput.addEventListener("change", function() {
-                if (this.files.length > 0) {
-                    fileName.textContent = "Arquivo: " + this.files[0].name;
-                    fileLabel.classList.add("active");
-                }
-            });
 
-            fileLabel.addEventListener("dragover", function(e) {
-                e.preventDefault();
-                this.classList.add("active");
-            });
-
-            fileLabel.addEventListener("dragleave", function(e) {
-                e.preventDefault();
-                if (!fileInput.files.length) {
-                    this.classList.remove("active");
-                }
-            });
-
-            fileLabel.addEventListener("drop", function(e) {
-                e.preventDefault();
-                fileInput.files = e.dataTransfer.files;
-                fileInput.dispatchEvent(new Event("change"));
-            });
-
-            document.getElementById("uploadForm").addEventListener("submit", function(e) {
-                e.preventDefault();
-                if (!fileInput.files.length) {
-                    alert("Selecione um arquivo");
-                    return;
-                }
-
-                var formData = new FormData();
-                formData.append("file", fileInput.files[0]);
-                formData.append("meta_moto", document.getElementById("metaMoto").value);
-                formData.append("meta_esc", document.getElementById("metaEsc").value);
-
-                document.getElementById("submitBtn").disabled = true;
-                document.getElementById("loading").style.display = "block";
-
-                fetch("/api/upload", {
-                    method: "POST",
-                    body: formData
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.href = "/report?id=" + data.report_id;
-                    } else {
-                        alert("Erro: " + data.error);
-                        document.getElementById("submitBtn").disabled = false;
-                        document.getElementById("loading").style.display = "none";
-                    }
-                })
-                .catch(err => {
-                    alert("Erro ao processar: " + err.message);
-                    document.getElementById("submitBtn").disabled = false;
-                    document.getElementById("loading").style.display = "none";
-                });
-            });
-        </script>
-    </body>
-    </html>
-    '''
+def generate_empty_state():
+    """Render page when no report exists yet"""
+    p = []
+    p.append('<!DOCTYPE html>')
+    p.append('<html lang="pt-BR">')
+    p.append('<head>')
+    p.append('<meta charset="UTF-8">')
+    p.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
+    p.append('<title>Relatório de Confiabilidade</title>')
+    p.append('<style>')
+    p.append('* { margin: 0; padding: 0; box-sizing: border-box; }')
+    p.append('body { font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }')
+    p.append('.header { background: linear-gradient(135deg, #1a3a52 0%, #2d5a7a 100%); color: white; padding: 25px 40px; }')
+    p.append('.header h1 { font-size: 28px; margin-bottom: 5px; }')
+    p.append('.header .subtitle { font-size: 14px; opacity: 0.9; }')
+    p.append('.empty-state { max-width: 700px; margin: 80px auto; text-align: center; padding: 40px; }')
+    p.append('.empty-state h2 { color: #1a3a52; margin-bottom: 15px; }')
+    p.append('.empty-state p { color: #666; margin-bottom: 30px; line-height: 1.6; }')
+    p.append('.empty-state .arrow { font-size: 40px; color: #1a3a52; margin-bottom: 20px; }')
+    p.append('</style>')
+    p.append('</head>')
+    p.append('<body>')
+    p.append('<div class="header">')
+    p.append('<h1>Relatório de Confiabilidade</h1>')
+    p.append('<div class="subtitle">Engenharia de Manutenção e Confiabilidade - Setor GRD GMO</div>')
+    p.append('</div>')
+    p.append('<div class="empty-state">')
+    p.append('<div class="arrow">&#8595;</div>')
+    p.append('<h2>Nenhum relatório processado ainda</h2>')
+    p.append('<p>Utilize o formulário abaixo para carregar a base de dados Excel e gerar o primeiro relatório de confiabilidade.</p>')
+    p.append('</div>')
+    p.append(generate_upload_section())
+    p.append('</body>')
+    p.append('</html>')
+    return ''.join(p)
 
 
 @app.route('/api/upload', methods=['POST'])
@@ -1375,15 +1354,23 @@ def upload_file():
         custom_meta = {'moto': meta_moto, 'esc': meta_esc}
 
         data = process_excel(filepath)
-        html_report = generate_report(data, custom_meta)
 
-        report_id = str(int(__import__('time').time() * 1000))
-        report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'report_' + report_id + '.html')
+        all_df_dates = []
+        for fleet_key in ['moto', 'esc']:
+            fdf = data[fleet_key].get('fleet_daily_df', {})
+            if fdf:
+                all_df_dates.extend(fdf.keys())
+        last_update_date = None
+        if all_df_dates:
+            max_key = max(all_df_dates)
+            last_update_date = datetime.strptime(max_key, '%Y-%m-%d').strftime('%d/%m/%Y')
 
-        with open(report_path, 'w', encoding='utf-8') as f:
+        html_report = generate_report(data, custom_meta, last_update_date)
+
+        with open(LATEST_REPORT_PATH, 'w', encoding='utf-8') as f:
             f.write(html_report)
 
-        return jsonify({'success': True, 'report_id': report_id}), 200
+        return jsonify({'success': True}), 200
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

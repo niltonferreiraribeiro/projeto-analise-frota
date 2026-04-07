@@ -323,6 +323,43 @@ def process_df_sheet(ws, equipment_ids):
     return daily_df, equipment_averages, fleet_daily_df, acumulado
 
 
+def process_plano_acao(wb):
+    """Read Plano de ação sheet and return list of actions per fleet"""
+    moto_eq_set = {'7401', '8201', '8202', '8301', '8302', '8303'}
+    esc_eq_set = {'9401', '9402', '9403', '9404', '9405', '9406', '9407'}
+    plano = {'moto': [], 'esc': []}
+
+    if 'Plano de ação' not in wb.sheetnames:
+        return plano
+
+    ws = wb['Plano de ação']
+    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=False):
+        oque = row[1].value if len(row) > 1 else None
+        quem = row[2].value if len(row) > 2 else None
+        quando = row[3].value if len(row) > 3 else None
+        onde = str(row[4].value).strip() if len(row) > 4 and row[4].value else None
+
+        if not oque:
+            continue
+
+        action = {
+            'oque': str(oque).strip(),
+            'quem': str(quem).strip() if quem else '',
+            'quando': str(quando).strip() if quando else '',
+            'onde': onde if onde else '',
+        }
+
+        if onde in esc_eq_set:
+            plano['esc'].append(action)
+        elif onde in moto_eq_set:
+            plano['moto'].append(action)
+        else:
+            plano['moto'].append(action)
+            plano['esc'].append(action)
+
+    return plano
+
+
 def process_excel(filepath):
     """Main processing: reads both fleets + both DF sheets"""
     wb = openpyxl.load_workbook(filepath, data_only=True)
@@ -346,9 +383,12 @@ def process_excel(filepath):
     esc_data['fleet_daily_df'] = esc_fleet_df
     esc_data['acumulado'] = esc_acum
 
+    plano = process_plano_acao(wb)
+
     return {
         'moto': moto_data,
         'esc': esc_data,
+        'plano': plano,
     }
 
 
@@ -576,8 +616,9 @@ def generate_report(data, custom_meta=None, last_update_date=None):
     p.append('<button class="pdf-btn" onclick="downloadPDF()">Baixar PDF</button>')
     p.append('</div>')
 
-    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras', meta['moto']))
-    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras', meta['esc']))
+    plano = data.get('plano', {})
+    p.append(generate_fleet_tab(data['moto'], 'moto', 'Motoniveladoras', meta['moto'], plano.get('moto', [])))
+    p.append(generate_fleet_tab(data['esc'], 'esc', 'Escavadeiras', meta['esc'], plano.get('esc', [])))
 
     p.append('</div>')
 
@@ -621,7 +662,7 @@ def generate_report(data, custom_meta=None, last_update_date=None):
     return ''.join(p)
 
 
-def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
+def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=None):
     """Generate content for a fleet dashboard - split by month"""
     p = []
 
@@ -1263,6 +1304,36 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta):
     p.append('</div>')
     p.append('</div>')
 
+    if plano_actions:
+        p.append('<div class="section">')
+        p.append('<h2 style="color: #8e44ad; border-bottom-color: #8e44ad;">Plano de Acao - {}</h2>'.format(fleet_name))
+        p.append('<table style="width: 100%; border-collapse: collapse; font-size: 13px;">')
+        p.append('<thead>')
+        p.append('<tr style="background: #1a3a52; color: white;">')
+        p.append('<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">#</th>')
+        p.append('<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">O que</th>')
+        p.append('<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Quem</th>')
+        p.append('<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Quando</th>')
+        p.append('<th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Equipamento</th>')
+        p.append('</tr>')
+        p.append('</thead>')
+        p.append('<tbody>')
+        for idx, action in enumerate(plano_actions, 1):
+            bg = '#f9f9f9' if idx % 2 == 0 else '#ffffff'
+            p.append('<tr style="background: {};">'.format(bg))
+            p.append('<td style="padding: 8px 10px; border: 1px solid #eee; font-weight: 600;">{}</td>'.format(idx))
+            p.append('<td style="padding: 8px 10px; border: 1px solid #eee;">{}</td>'.format(action['oque']))
+            p.append('<td style="padding: 8px 10px; border: 1px solid #eee;">{}</td>'.format(action['quem']))
+            p.append('<td style="padding: 8px 10px; border: 1px solid #eee;">{}</td>'.format(action['quando']))
+            eq_prefix = 'MM' if tab_id == 'moto' else 'EM'
+            eq_display = eq_prefix + action['onde'] if action['onde'] else ''
+            p.append('<td style="padding: 8px 10px; border: 1px solid #eee;">{}</td>'.format(eq_display))
+            p.append('</tr>')
+        p.append('</tbody>')
+        p.append('</table>')
+        p.append('<p style="font-size: 11px; color: #888; margin-top: 10px;">Total de acoes: {} | Atualizado apos reuniao de perfil de perda</p>'.format(len(plano_actions)))
+        p.append('</div>')
+
     p.append('</div>')  # closes fleet-content div
 
     return ''.join(p)
@@ -1354,6 +1425,16 @@ def upload_file():
         custom_meta = {'moto': meta_moto, 'esc': meta_esc}
 
         data = process_excel(filepath)
+
+        if 'file_pa' in request.files:
+            file_pa = request.files['file_pa']
+            if file_pa.filename and allowed_file(file_pa.filename):
+                pa_filename = secure_filename(file_pa.filename)
+                pa_filepath = os.path.join(app.config['UPLOAD_FOLDER'], pa_filename)
+                file_pa.save(pa_filepath)
+                pa_wb = openpyxl.load_workbook(pa_filepath, data_only=True)
+                plano_updated = process_plano_acao(pa_wb)
+                data['plano'] = plano_updated
 
         all_df_dates = []
         for fleet_key in ['moto', 'esc']:

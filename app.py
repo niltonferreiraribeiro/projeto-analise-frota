@@ -324,29 +324,40 @@ def process_df_sheet(ws, equipment_ids):
 
 
 def process_plano_acao(wb):
-    """Read Plano de ação sheet and return list of actions per fleet"""
+    """Read Plano de acao sheet and return list of actions per fleet"""
     moto_eq_set = {'7401', '8201', '8202', '8301', '8302', '8303'}
     esc_eq_set = {'9401', '9402', '9403', '9404', '9405', '9406', '9407'}
     plano = {'moto': [], 'esc': []}
 
-    if 'Plano de ação' not in wb.sheetnames:
+    sheet_name = None
+    for sn in wb.sheetnames:
+        if 'plano' in sn.lower():
+            sheet_name = sn
+            break
+
+    if not sheet_name:
         return plano
 
-    ws = wb['Plano de ação']
+    ws = wb[sheet_name]
     for row in ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=False):
-        oque = row[1].value if len(row) > 1 else None
-        quem = row[2].value if len(row) > 2 else None
-        quando = row[3].value if len(row) > 3 else None
-        onde = str(row[4].value).strip() if len(row) > 4 and row[4].value else None
+        if len(row) < 5:
+            continue
+
+        oque = row[1].value
+        quem = row[2].value
+        quando = row[3].value
+        onde_val = row[4].value
 
         if not oque:
             continue
+
+        onde = str(onde_val).strip() if onde_val else ''
 
         action = {
             'oque': str(oque).strip(),
             'quem': str(quem).strip() if quem else '',
             'quando': str(quando).strip() if quando else '',
-            'onde': onde if onde else '',
+            'onde': onde,
         }
 
         if onde in esc_eq_set:
@@ -354,8 +365,9 @@ def process_plano_acao(wb):
         elif onde in moto_eq_set:
             plano['moto'].append(action)
         else:
-            plano['moto'].append(action)
-            plano['esc'].append(action)
+            if onde and onde != '':
+                plano['moto'].append(action)
+                plano['esc'].append(action)
 
     return plano
 

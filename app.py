@@ -668,14 +668,20 @@ def generate_report(data, custom_meta=None, last_update_date=None):
 
     p.append('<script>')
     p.append('function changeFleet(fleetId) {')
-    p.append('  document.querySelectorAll(".fleet-content").forEach(el => el.classList.remove("active"));')
-    p.append('  document.getElementById("fleet_" + fleetId).classList.add("active");')
-    p.append('  var names = {"moto": "Motoniveladoras", "esc": "Escavadeiras"};')
+    p.append('  try {')
+    p.append('    var allFleets = document.querySelectorAll(".fleet-content");')
+    p.append('    for (var i = 0; i < allFleets.length; i++) { allFleets[i].style.display = "none"; }')
+    p.append('    var target = document.getElementById("fleet_" + fleetId);')
+    p.append('    if (target) { target.style.display = "block"; }')
+    p.append('    var names = {"moto": "Motoniveladoras", "esc": "Escavadeiras"};')
     moto_meta_str = '{:.2f}'.format(meta['moto']).replace('.', ',')
     esc_meta_str = '{:.2f}'.format(meta['esc']).replace('.', ',')
-    p.append('  var metas = {{"moto": "{}%", "esc": "{}%"}};'.format(moto_meta_str, esc_meta_str))
-    p.append('  document.getElementById("header-fleet").textContent = names[fleetId] || fleetId;')
-    p.append('  document.getElementById("meta-df").textContent = metas[fleetId] || "90,50%";')
+    p.append('    var metas = {{"moto": "{}%", "esc": "{}%"}};'.format(moto_meta_str, esc_meta_str))
+    p.append('    var hEl = document.getElementById("header-fleet");')
+    p.append('    var mEl = document.getElementById("meta-df");')
+    p.append('    if (hEl) hEl.textContent = names[fleetId] || fleetId;')
+    p.append('    if (mEl) mEl.textContent = metas[fleetId] || "";')
+    p.append('  } catch(e) { console.error("changeFleet error:", e); }')
     p.append('}')
     p.append('function downloadPDF() {')
     p.append('  var active = document.querySelector(".fleet-content.active");')
@@ -737,14 +743,14 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     acumulado = fleet_data.get('acumulado', None)
 
     if not failures:
-        active_class_er = ' active' if tab_id == 'moto' else ''
-        p.append('<div id="fleet_{}" class="fleet-content{}">'.format(tab_id, active_class_er))
+        display_style = 'block' if tab_id == 'moto' else 'none'
+        p.append('<div id="fleet_{}" class="fleet-content" style="display:{};">'.format(tab_id, display_style))
         p.append('<p>Sem dados disponíveis para esta frota.</p>')
         p.append('</div>')
         return ''.join(p)
 
-    active_class = ' active' if tab_id == 'moto' else ''
-    p.append('<div id="fleet_{}" class="fleet-content{}">'.format(tab_id, active_class))
+    display_style = 'block' if tab_id == 'moto' else 'none'
+    p.append('<div id="fleet_{}" class="fleet-content" style="display:{};">'.format(tab_id, display_style))
 
     MONTH_NAMES = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Marco', 4: 'Abril', 5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'}
 
@@ -963,6 +969,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('<canvas id="df_{}"></canvas>'.format(tab_id))
     p.append('</div>')
     p.append('<script>')
+    p.append('try {')
     p.append('var ctx_df_{} = document.getElementById("df_{}").getContext("2d");'.format(tab_id, tab_id))
 
     sorted_fleet_dates_all = sorted(fleet_daily_df.keys())
@@ -1002,6 +1009,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('    plugins: { legend: { display: true } }')
     p.append('  }')
     p.append('});')
+    p.append('} catch(e) { console.warn("chart df error:", e); }')
     p.append('</script>')
     p.append('</div>')
 
@@ -1064,6 +1072,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('<canvas id="pareto_{}_prev"></canvas>'.format(tab_id))
     p.append('</div>')
     p.append('<script>')
+    p.append('try {')
     p.append('var ctx_{}_prev = document.getElementById("pareto_{}_prev").getContext("2d");'.format(tab_id, tab_id))
 
     pareto_prev, _ = get_pareto_data(prev_sys_failures)
@@ -1115,6 +1124,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('    plugins: { legend: { display: true }, title: { display: false } }')
     p.append('  }')
     p.append('});')
+    p.append('} catch(e) { console.warn("chart pareto_prev error:", e); }')
     p.append('</script>')
     p.append('</div>')
 
@@ -1124,6 +1134,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('<canvas id="hours_{}_prev"></canvas>'.format(tab_id))
     p.append('</div>')
     p.append('<script>')
+    p.append('try {')
     p.append('var ctx_hours_{}_prev = document.getElementById("hours_{}_prev").getContext("2d");'.format(tab_id, tab_id))
 
     eq_hours_sorted = sorted(prev_eq_hours.items(), key=lambda x: x[1], reverse=True)
@@ -1151,6 +1162,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     p.append('    plugins: { legend: { display: true } }')
     p.append('  }')
     p.append('});')
+    p.append('} catch(e) { console.warn("chart hours_prev error:", e); }')
     p.append('</script>')
     p.append('</div>')
 
@@ -1258,6 +1270,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
         p.append('<canvas id="pareto_{}_curr"></canvas>'.format(tab_id))
         p.append('</div>')
         p.append('<script>')
+        p.append('try {')
         p.append('var ctx_{}_curr = document.getElementById("pareto_{}_curr").getContext("2d");'.format(tab_id, tab_id))
 
         pareto_curr, _ = get_pareto_data(curr_sys_failures)
@@ -1309,6 +1322,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
         p.append('    plugins: { legend: { display: true }, title: { display: false } }')
         p.append('  }')
         p.append('});')
+        p.append('} catch(e) { console.warn("chart pareto_curr error:", e); }')
         p.append('</script>')
         p.append('</div>')
 
@@ -1318,6 +1332,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
         p.append('<canvas id="hours_{}_curr"></canvas>'.format(tab_id))
         p.append('</div>')
         p.append('<script>')
+        p.append('try {')
         p.append('var ctx_hours_{}_curr = document.getElementById("hours_{}_curr").getContext("2d");'.format(tab_id, tab_id))
 
         eq_hours_sorted_curr = sorted(curr_eq_hours.items(), key=lambda x: x[1], reverse=True)
@@ -1345,6 +1360,7 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
         p.append('    plugins: { legend: { display: true } }')
         p.append('  }')
         p.append('});')
+        p.append('} catch(e) { console.warn("chart hours_curr error:", e); }')
         p.append('</script>')
         p.append('</div>')
 

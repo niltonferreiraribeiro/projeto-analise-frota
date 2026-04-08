@@ -339,42 +339,53 @@ def process_plano_acao(wb):
         return plano
 
     ws = wb[sheet_name]
-    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=False):
-        if len(row) < 5:
-            continue
+    for row_idx, row in enumerate(ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=False), start=3):
+        try:
+            oque_cell = row[1]
+            quem_cell = row[2]
+            quando_cell = row[3]
+            onde_cell = row[4]
 
-        oque = row[1].value
-        quem = row[2].value
-        quando = row[3].value
-        onde_val = row[4].value
+            oque_val = oque_cell.value if oque_cell else None
+            quem_val = quem_cell.value if quem_cell else None
+            quando_val = quando_cell.value if quando_cell else None
+            onde_val = onde_cell.value if onde_cell else None
 
-        if not oque:
-            continue
+            if not oque_val:
+                continue
 
-        onde = str(onde_val).strip() if onde_val else ''
+            oque = str(oque_val).strip()
+            quem = str(quem_val).strip() if quem_val else ''
+            quando = str(quando_val).strip() if quando_val else ''
+            onde = str(onde_val).strip() if onde_val else ''
 
-        action = {
-            'oque': str(oque).strip(),
-            'quem': str(quem).strip() if quem else '',
-            'quando': str(quando).strip() if quando else '',
-            'onde': onde,
-        }
+            if not oque or oque == 'O que':
+                continue
 
-        if onde in esc_eq_set:
-            plano['esc'].append(action)
-        elif onde in moto_eq_set:
-            plano['moto'].append(action)
-        else:
-            if onde and onde != '':
-                plano['moto'].append(action)
+            action = {
+                'oque': oque,
+                'quem': quem,
+                'quando': quando,
+                'onde': onde,
+            }
+
+            if onde in esc_eq_set:
                 plano['esc'].append(action)
+            elif onde in moto_eq_set:
+                plano['moto'].append(action)
+            else:
+                if onde and onde != '':
+                    plano['moto'].append(action)
+                    plano['esc'].append(action)
+        except Exception:
+            continue
 
     return plano
 
 
 def process_excel(filepath):
     """Main processing: reads both fleets + both DF sheets"""
-    wb = openpyxl.load_workbook(filepath, data_only=True)
+    wb = openpyxl.load_workbook(filepath, data_only=False)
 
     moto_eq = ['7401', '8201', '8202', '8301', '8302', '8303']
     esc_eq = ['9401', '9402', '9403', '9404', '9405', '9406', '9407']
@@ -1444,7 +1455,7 @@ def upload_file():
                 pa_filename = secure_filename(file_pa.filename)
                 pa_filepath = os.path.join(app.config['UPLOAD_FOLDER'], pa_filename)
                 file_pa.save(pa_filepath)
-                pa_wb = openpyxl.load_workbook(pa_filepath, data_only=True)
+                pa_wb = openpyxl.load_workbook(pa_filepath, data_only=False)
                 plano_updated = process_plano_acao(pa_wb)
                 data['plano'] = plano_updated
 

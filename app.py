@@ -598,11 +598,25 @@ def generate_report(data, custom_meta=None, last_update_date=None):
         '.critical-card { border-left: 4px solid #e74c3c; background: rgba(231, 76, 60, 0.02); padding: 15px; margin-bottom: 12px; border-radius: 4px; }',
         '.critical-card h3 { color: #e74c3c; font-size: 14px; margin-bottom: 8px; }',
         '.critical-card p { font-size: 13px; color: #555; margin: 4px 0; }',
-        '.days-critical { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }',
-        '.day-card { border: 2px solid #e74c3c; background: rgba(231, 76, 60, 0.05); padding: 12px; border-radius: 4px; }',
-        '.day-card-date { font-weight: bold; color: #e74c3c; font-size: 14px; margin-bottom: 6px; }',
-        '.day-card-df { font-size: 12px; color: #666; }',
-        '.day-card-failure { font-size: 12px; color: #555; margin-top: 6px; padding-top: 6px; border-top: 1px solid #f0f0f0; }',
+        '.days-critical { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }',
+        '.day-card { border: 1px solid #ddd; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.3s; cursor: pointer; }',
+        '.day-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-2px); border-color: #1a3a52; }',
+        '.day-card-date { font-weight: bold; color: #1a3a52; font-size: 16px; margin-bottom: 8px; }',
+        '.day-card-df { font-size: 14px; color: #27ae60; font-weight: 600; margin-bottom: 8px; }',
+        '.day-card-failure { font-size: 12px; color: #555; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }',
+        '.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }',
+        '.modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 6px; max-width: 700px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }',
+        '.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }',
+        '.modal-header h2 { color: #1a3a52; margin: 0; }',
+        '.modal-close { font-size: 28px; font-weight: bold; color: #aaa; cursor: pointer; background: none; border: none; padding: 0; }',
+        '.modal-close:hover { color: #000; }',
+        '.modal-df-info { background: #f9f9f9; padding: 15px; border-radius: 4px; margin-bottom: 20px; border-left: 4px solid #e74c3c; }',
+        '.modal-df-info strong { color: #1a3a52; display: block; font-size: 14px; }',
+        '.modal-failures-table { width: 100%; border-collapse: collapse; }',
+        '.modal-failures-table thead { background: #1a3a52; color: white; }',
+        '.modal-failures-table th { padding: 12px; text-align: left; font-size: 13px; font-weight: 600; }',
+        '.modal-failures-table td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; }',
+        '.modal-failures-table tbody tr:hover { background: #f9f9f9; }',
         '.footer { background: #f0f0f0; padding: 20px; text-align: center; color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #ddd; }',
         '.action-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; margin: 2px; }',
         '.action-critica { background: #e74c3c; color: white; }',
@@ -676,6 +690,31 @@ def generate_report(data, custom_meta=None, last_update_date=None):
     p.append('    jsPDF: { orientation: "landscape", unit: "mm", format: "a4" }')
     p.append('  };')
     p.append('  html2pdf().set(opt).from(active).save();')
+    p.append('}')
+    p.append('function showDayModal(date, df, failuresJson) {')
+    p.append('  var modal = document.getElementById("dayModal");')
+    p.append('  if (!modal) {')
+    p.append('    modal = document.createElement("div");')
+    p.append('    modal.id = "dayModal";')
+    p.append('    modal.className = "modal";')
+    p.append('    document.body.appendChild(modal);')
+    p.append('  }')
+    p.append('  var failures = JSON.parse(failuresJson);')
+    p.append('  var html = "<div class=\"modal-content\"><div class=\"modal-header\"><h2>Detalhes do Dia " + date + "</h2><button class=\"modal-close\" onclick=\"document.getElementById(\\\"dayModal\\\").style.display=\\\"none\\\"\">&times;</button></div>";')
+    p.append('  html += "<div class=\"modal-df-info\"><strong>DF do dia:</strong> " + df.toFixed(2) + "%</div>";')
+    p.append('  if (failures.length > 0) {')
+    p.append('    html += "<table class=\"modal-failures-table\"><thead><tr><th>O que</th><th>Duração</th><th>Sistema</th></tr></thead><tbody>";')
+    p.append('    failures.forEach(f => {')
+    p.append('      html += "<tr><td>" + f.oque + "</td><td>" + f.duracao + "h</td><td>" + f.sistema + "</td></tr>";')
+    p.append('    });')
+    p.append('    html += "</tbody></table>";')
+    p.append('  } else {')
+    p.append('    html += "<p style=\"text-align: center; color: #666;\">Sem falhas registradas neste dia</p>";')
+    p.append('  }')
+    p.append('  html += "</div>";')
+    p.append('  modal.innerHTML = html;')
+    p.append('  modal.style.display = "block";')
+    p.append('  modal.onclick = function(event) { if (event.target == modal) modal.style.display = "none"; };')
     p.append('}')
     p.append('</script>')
 
@@ -884,24 +923,29 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
 
     p.append('</div>')
 
+    critical_threshold = 50 if tab_id == 'moto' else 85
     critical_days = []
     for date_key, df_val in df_dates_prev.items():
-        if df_val < 85:
+        if df_val < critical_threshold:
             critical_days.append((date_key, df_val))
 
     if critical_days:
         p.append('<div class="subsection">')
-        p.append('<h3>Dias Criticos (DF &lt; 85%)</h3>')
+        threshold_text = '50%' if tab_id == 'moto' else '85%'
+        p.append('<h3>Dias Criticos (DF &lt; {})</h3>'.format(threshold_text))
         p.append('<div class="days-critical">')
 
         for date_key, df_val in sorted(critical_days)[-10:]:
             date_obj = datetime.strptime(date_key, '%Y-%m-%d')
             date_display = date_obj.strftime('%d/%m')
 
+            day_failures = [f for f in failures_prev if f['data'] == date_obj.date()]
+            failures_json = _json.dumps([{'oque': f.get('descricao', 'N/A'), 'quem': '', 'duracao': round(f['duracao']/3600.0, 1), 'sistema': f['system']} for f in day_failures])
+
             longest_fail = None
             longest_duration = 0
-            for f in failures_prev:
-                if f['data'] == date_obj.date() and f['duracao'] > longest_duration:
+            for f in day_failures:
+                if f['duracao'] > longest_duration:
                     longest_duration = f['duracao']
                     longest_fail = f
 
@@ -911,11 +955,12 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
                 if longest_fail['subsystem']:
                     failure_text += ' - ' + longest_fail['subsystem']
 
-            p.append('<div class="day-card">')
+            p.append('<div class="day-card" style="cursor: pointer;" onclick="showDayModal(\'{}\', {:.2f}, \'{}\')">'.format(date_display, df_val, failures_json.replace("'", "\\'")))
             p.append('<div class="day-card-date">{}</div>'.format(date_display))
             p.append('<div class="day-card-df">DF: {:.2f}%</div>'.format(df_val))
             if failure_text:
                 p.append('<div class="day-card-failure">{}</div>'.format(failure_text))
+            p.append('<div style="font-size: 11px; color: #666; margin-top: 6px;">Clique para ver detalhes</div>')
             p.append('</div>')
 
         p.append('</div>')

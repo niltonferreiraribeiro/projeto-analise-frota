@@ -703,9 +703,9 @@ def generate_report(data, custom_meta=None, last_update_date=None):
     p.append('  var html = "<div class=\"modal-content\"><div class=\"modal-header\"><h2>Detalhes do Dia " + date + "</h2><button class=\"modal-close\" onclick=\"document.getElementById(\\\"dayModal\\\").style.display=\\\"none\\\"\">&times;</button></div>";')
     p.append('  html += "<div class=\"modal-df-info\"><strong>DF do dia:</strong> " + df.toFixed(2) + "%</div>";')
     p.append('  if (failures.length > 0) {')
-    p.append('    html += "<table class=\"modal-failures-table\"><thead><tr><th>O que</th><th>Duração</th><th>Sistema</th></tr></thead><tbody>";')
+    p.append('    html += "<table class=\"modal-failures-table\"><thead><tr><th>Falha</th><th>Duração</th><th>Equipamento</th></tr></thead><tbody>";')
     p.append('    failures.forEach(f => {')
-    p.append('      html += "<tr><td>" + f.oque + "</td><td>" + f.duracao + "h</td><td>" + f.sistema + "</td></tr>";')
+    p.append('      html += "<tr><td>" + f.oque + "</td><td>" + f.duracao + "h</td><td>" + f.equip + "</td></tr>";')
     p.append('    });')
     p.append('    html += "</tbody></table>";')
     p.append('  } else {')
@@ -737,7 +737,8 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
     acumulado = fleet_data.get('acumulado', None)
 
     if not failures:
-        p.append('<div id="fleet_{}" class="fleet-content active">'.format(tab_id))
+        active_class_er = ' active' if tab_id == 'moto' else ''
+        p.append('<div id="fleet_{}" class="fleet-content{}">'.format(tab_id, active_class_er))
         p.append('<p>Sem dados disponíveis para esta frota.</p>')
         p.append('</div>')
         return ''.join(p)
@@ -940,27 +941,17 @@ def generate_fleet_tab(fleet_data, tab_id, fleet_name, df_meta, plano_actions=No
             date_display = date_obj.strftime('%d/%m')
 
             day_failures = [f for f in failures_prev if f['data'] == date_obj.date()]
-            failures_json = _json.dumps([{'oque': f.get('descricao', 'N/A'), 'quem': '', 'duracao': round(f['duracao']/3600.0, 1), 'sistema': f['system']} for f in day_failures])
+            eq_prefix_local = 'MM' if tab_id == 'moto' else 'EM'
+            failures_json = _json.dumps([{
+                'oque': (f['system'] + (' - ' + f['subsystem'] if f['subsystem'] else '')).strip(),
+                'duracao': round(f['duracao'] / 3600.0, 1),
+                'equip': eq_prefix_local + str(f['eq_id'])
+            } for f in day_failures])
+            failures_json_safe = failures_json.replace('"', '&quot;').replace("'", "\\'")
 
-            longest_fail = None
-            longest_duration = 0
-            for f in day_failures:
-                if f['duracao'] > longest_duration:
-                    longest_duration = f['duracao']
-                    longest_fail = f
-
-            failure_text = ''
-            if longest_fail:
-                failure_text = 'Falha: ' + longest_fail['system']
-                if longest_fail['subsystem']:
-                    failure_text += ' - ' + longest_fail['subsystem']
-
-            p.append('<div class="day-card" style="cursor: pointer;" onclick="showDayModal(\'{}\', {:.2f}, \'{}\')">'.format(date_display, df_val, failures_json.replace("'", "\\'")))
+            p.append('<div class="day-card" style="cursor: pointer;" onclick="showDayModal(\'{}\', {:.2f}, \'{}\')">'.format(date_display, df_val, failures_json_safe))
             p.append('<div class="day-card-date">{}</div>'.format(date_display))
             p.append('<div class="day-card-df">DF: {:.2f}%</div>'.format(df_val))
-            if failure_text:
-                p.append('<div class="day-card-failure">{}</div>'.format(failure_text))
-            p.append('<div style="font-size: 11px; color: #666; margin-top: 6px;">Clique para ver detalhes</div>')
             p.append('</div>')
 
         p.append('</div>')
